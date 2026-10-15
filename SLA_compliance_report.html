@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تقرير الالتزام بـ SLA – المنطقة الغربية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script>
+/* ⚡ نبدأ طلب البيانات فورًا بالتوازي مع تحميل مكتبة الرسم (بدل الانتظار لحد ما تخلص) */
+(function(){ try{
+  var u="https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec?weeks=10";
+  window.__EARLY={u:u,p:fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+}catch(e){} })();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ── ألوان الداشبورد (نفس رموز dashboard.css) ── */
+:root{
+  --navy:#0d2f40; --navy-2:#163d52; --navy-deep:#081e2a;
+  --teal:#0d849c; --teal-3:#0b6b7e; --brass:#b08a4e; --brass-2:#d4af6a;
+  --c-positive:#066a52; --c-danger:#7d1f2c; --c-warning:#c07a14;
+  --bg:#eef3f7; --bg-2:#f7fafc; --bg-3:#ffffff;
+  --tx-main:#0c2330; --tx-sec:#2c5468; --tx-muted:#52707e;
+  --bd:#d6e2ea;
+  /* ألوان الأسطر (نفس الباوربوينت) */
+  --s-jed:#1a3358; --s-mak:#86a894; --s-mad:#e0a050; --s-taf:#7b5ea7; --s-west:#c0392b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"IBM Plex Sans Arabic",Tajawal,sans-serif;color:var(--tx-main);
+  background:linear-gradient(180deg,#f7fafc 0%,var(--bg) 100%);
+  display:flex;flex-direction:column;min-height:100vh;
+}
+/* ── الشريط العلوي ── */
+.topbar{
+  height:60px;flex:0 0 60px;display:flex;align-items:stretch;justify-content:space-between;position:relative;
+  background:linear-gradient(180deg,rgba(5,18,26,.98) 0%,rgba(7,28,40,.96) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.05),0 8px 24px rgba(3,12,18,.28);overflow:hidden;
+}
+.topbar::after{content:"";position:absolute;inset:auto 0 0 0;height:2px;
+  background:linear-gradient(to left,transparent 0%,var(--teal-3) 14%,var(--brass-2) 50%,var(--teal-3) 86%,transparent 100%);opacity:.9}
+.tb-brand{display:flex;align-items:center;gap:16px;padding:0 22px}
+.tb-brand img{display:block;opacity:.94;filter:brightness(0) invert(1)}
+.tb-divider{width:1px;height:26px;background:rgba(255,255,255,.18)}
+.tb-title{display:flex;align-items:center;color:#fff;font-family:Tajawal;font-weight:700;font-size:15px;opacity:.92;padding:0 10px}
+.tb-right{display:flex;align-items:center;gap:10px;padding:0 18px;color:rgba(255,255,255,.5);font-size:11px}
+.dot{width:8px;height:8px;border-radius:50%;background:#7a8b95}
+.dot.ok{background:#2fbf8f;box-shadow:0 0 0 3px rgba(47,191,143,.2)}
+.dot.loading{background:var(--brass-2);animation:pulse 1s infinite}
+.dot.err{background:#e0566a}
+@keyframes pulse{50%{opacity:.35}}
+.tb-btn{font-family:Tajawal;font-size:12px;font-weight:700;color:#fff;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:6px 12px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tb-btn:hover{background:rgba(255,255,255,.16)}
+.tb-btn:disabled{opacity:.5;cursor:default}
+/* ── المنصة (الصفحة الواحدة) ── */
+.page{flex:1 0 auto;display:flex;padding:20px 28px 22px;min-height:0}
+.stage{
+  flex:1;display:flex;flex-direction:column;min-height:560px;background:var(--bg-3);border:1px solid var(--bd);
+  border-radius:20px;box-shadow:0 10px 34px rgba(13,47,64,.08);padding:22px 28px 16px;position:relative;overflow:hidden;
+}
+.stage::before{content:"";position:absolute;top:0;right:0;width:130px;height:6px;background:var(--brass);border-radius:0 0 6px 6px}
+.hd{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.hd h1{font-family:Tajawal;font-size:26px;font-weight:900;color:var(--navy);line-height:1.35}
+.hd .sub{margin-top:4px;font-size:13px;color:var(--tx-muted);font-weight:500}
+.filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.filters .lbl{font-size:12px;color:var(--tx-muted);font-weight:600;margin-left:4px}
+.chip{font-family:Tajawal;font-size:12.5px;font-weight:700;color:var(--tx-sec);background:var(--bg-2);border:1.5px solid var(--bd);
+  border-radius:999px;padding:5px 14px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--teal);color:var(--teal-3)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.card{
+  flex:1 0 auto;display:flex;flex-direction:column;min-height:0;margin-top:14px;border:1px solid var(--bd);border-radius:16px;
+  background:#fff;padding:12px 18px 8px;
+}
+.card-hd{display:flex;align-items:center;gap:10px;font-family:Tajawal;font-weight:800;font-size:15px;color:var(--navy)}
+.card-hd .pt{width:9px;height:9px;border-radius:50%;background:var(--navy)}
+.card-hd small{font-weight:500;color:var(--tx-muted);font-size:11.5px}
+.chartbox{flex:1;position:relative;min-height:440px;direction:ltr;margin-top:6px}
+.chartbox canvas{position:absolute;inset:0}
+.legend{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;padding:8px 0 4px;direction:rtl}
+.lg{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--tx-sec);cursor:pointer;user-select:none}
+.lg i{display:block;width:26px;height:0;border-top:3px solid;position:relative}
+.lg i::after{content:"";position:absolute;top:-6px;left:9px;width:8px;height:8px;border-radius:50%;background:inherit;border:2px solid;border-color:inherit;background:currentColor}
+.lg.off{opacity:.35;text-decoration:line-through}
+.lg.west{font-weight:900;font-size:14.5px;padding:2px 12px;border-radius:999px;background:#fbeceb;border:1.5px solid #e6b3ae}
+.lg.west i{border-top-width:6px;width:30px}
+.lg.west i::after{top:-8px;left:10px;width:11px;height:11px}
+.lg.west span{color:#9d2a1e!important}
+.page,.stage,.card{min-width:0}.stage{max-width:100%}
+.kpis{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:12px;margin-top:14px}
+.kpi{min-width:0;background:#fff;border:1px solid var(--bd);border-radius:14px;padding:11px 16px 12px;border-top:5px solid var(--kc);position:relative}
+.kpi .kn{font-family:Tajawal;font-weight:800;font-size:14px;color:var(--tx-sec);display:flex;align-items:center;gap:7px}
+.kpi .kn i{width:10px;height:10px;border-radius:50%;background:var(--kc);display:inline-block}
+.kpi .kv{font-family:Tajawal;font-weight:900;font-size:34px;line-height:1.15;color:var(--kt);margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .kd{display:inline-flex;white-space:nowrap;align-items:center;gap:5px;margin-top:3px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;font-family:Tajawal;font-variant-numeric:tabular-nums}
+.kpi .kd.up{background:#e3f4ee;color:#066a52}.kpi .kd.dn{background:#fbe6e8;color:#9c1f2e}.kpi .kd.eq,.kpi .kd.na{background:#eef3f7;color:#52707e}
+.kpi .kw{font-size:11px;color:var(--tx-muted);margin-top:4px;font-weight:600}
+.kpi.west{background:#fdf3f2;border-color:#e6b3ae}
+.kpi.west .kv{font-size:46px}.kpi.west .kn{font-size:16px;font-weight:900;color:#9d2a1e}
+.tblwrap{max-width:100%;display:none;margin-top:12px;overflow-x:auto;direction:ltr}
+.tblwrap.show{display:block}
+table.nums{width:100%;border-collapse:separate;border-spacing:0;font-family:Tajawal;font-size:13.5px;text-align:center;border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:#fff}
+table.nums th{background:var(--bg-2);color:var(--tx-sec);font-weight:700;padding:8px 6px;border-bottom:1px solid var(--bd);white-space:nowrap;font-size:12.5px}
+table.nums td{padding:8px 6px;border-bottom:1px solid #edf2f6;font-weight:700;font-variant-numeric:tabular-nums}
+table.nums tr:last-child td{border-bottom:0}
+table.nums td.rn,table.nums th.rn{text-align:right;padding:8px 14px;white-space:nowrap;position:sticky;left:0;background:inherit;direction:rtl;min-width:130px;border-right:1px solid var(--bd)}
+table.nums td.rn{background:#fff}
+table.nums td.rn i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-left:8px;vertical-align:-1px}
+table.nums tr.west td{background:#fbeceb;font-weight:900;font-size:15px;color:#9d2a1e}
+table.nums tr.west td.rn{background:#fbeceb}
+table.nums td.na{color:#9aaab4;font-weight:500}
+.foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--tx-muted)}
+.foot select{font-family:Tajawal;font-size:12px;font-weight:600;color:var(--navy);border:1.5px solid var(--bd);border-radius:8px;padding:3px 8px;background:var(--bg-2)}
+.foot b{color:var(--tx-sec)}
+/* ── حالات التحميل والخطأ ── */
+.overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;
+  background:rgba(255,255,255,.9);z-index:5;text-align:center;padding:30px}
+.overlay.show{display:flex}
+.spin{width:38px;height:38px;border:4px solid var(--bd);border-top-color:var(--teal);border-radius:50%;animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.overlay .msg{font-family:Tajawal;font-size:16px;font-weight:800;color:var(--navy)}
+.overlay .det{font-size:12.5px;color:var(--tx-muted);max-width:560px;line-height:1.8}
+.overlay .row{display:flex;gap:8px;margin-top:6px}
+.btn2{font-family:Tajawal;font-size:13px;font-weight:700;border-radius:10px;padding:8px 18px;cursor:pointer;border:1.5px solid var(--navy);background:var(--navy);color:#fff}
+.btn2.ghost{background:#fff;color:var(--navy)}
+.banner{display:none;margin-top:10px;padding:8px 14px;border-radius:10px;font-size:12.5px;font-weight:600;background:#fdf6ec;color:#92590a;border:1px solid #f0d9b4}
+.banner.show{display:block}
+@media(max-width:820px){
+  .page{padding:12px}.stage{padding:16px;min-height:0;overflow:visible}.hd h1{font-size:19px}
+  .tb-title,.tb-divider:last-of-type,.tb-right span{display:none}
+  .tb-brand{padding:0 12px;gap:10px}.tb-brand img{height:auto!important;max-height:22px;max-width:80px}
+  .tb-right{padding:0 10px;gap:6px}.tb-btn{padding:5px 8px;font-size:11px}
+  .card{flex:none;padding:10px 8px 6px}.chartbox{flex:none;height:360px;min-height:360px}
+  .legend{gap:12px}.foot{font-size:10.5px}
+  .kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.kpi .kd{white-space:normal;line-height:1.5;border-radius:10px}.kpi .kn{font-size:13px}.kpi.west{grid-column:1/-1}.kpi .kv{font-size:26px}.kpi.west .kv{font-size:38px}.kpi{padding:9px 12px}
+  table.nums{font-size:12px}table.nums th{font-size:11px;padding:7px 4px}table.nums td{padding:7px 4px}table.nums td.rn,table.nums th.rn{min-width:104px;padding:7px 8px}table.nums tr.west td{font-size:13px}
+  .lg.west{font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-brand">
+    <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" style="height:21px">
+    <div class="tb-divider"></div>
+    <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" style="height:36px">
+    <div class="tb-divider"></div>
+    <div class="tb-title" style="padding:0">تقرير الالتزام بـ SLA</div>
+  </div>
+  <div class="tb-right">
+    <div class="dot loading" id="dot"></div>
+    <span>آخر تحديث للبيانات:</span><span id="lastTime">—</span>
+    <button class="tb-btn" id="btnReload">↻ تحديث</button>
+    <button class="tb-btn" id="btnPng">⬇ تصدير صورة</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="stage" id="stage">
+    <div class="hd">
+      <div>
+        <h1>نسبة الالتزام بـ SLA أسبوعياً – المناطق الأربع والمنطقة الغربية</h1>
+        <div class="sub" id="sub">—</div>
+      </div>
+      <div class="filters" id="filters" data-html2canvas-ignore="true">
+        <span class="lbl">عدد الأسابيع:</span>
+        <button class="chip" data-n="4">آخر 4</button>
+        <button class="chip" data-n="6">آخر 6</button>
+        <button class="chip on" data-n="8">آخر 8</button>
+        <button class="chip" data-n="10">آخر 10</button>
+      </div>
+    </div>
+
+    <div class="banner" id="banner"></div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <div class="card-hd"><span class="pt"></span>نسبة الالتزام بـ SLA <small>تاريخ الأسبوع: يوم/شهر</small></div>
+      <div class="chartbox"><canvas id="cv"></canvas></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="tblwrap" id="tblwrap"><table class="nums" id="nums"></table></div>
+
+    <div class="foot">
+      <div data-html2canvas-ignore="true" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="chip" id="btnTbl" type="button">عرض جدول الأرقام</button><span>طريقة الحساب:</span>
+        <select id="mode">
+          <option value="tab">كما في تبويب البلاغات: (الكل − «تم اختراقه») ÷ الكل</option>
+          <option value="eval">المُقيَّم فقط: «ضمن SLA» ÷ («ضمن SLA» + «تم اختراقه»)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="overlay show" id="overlay">
+      <div class="spin" id="spin"></div>
+      <div class="msg" id="ovMsg">جاري تحميل البلاغات…</div>
+      <div class="det" id="ovDet">قد يستغرق التحميل عدة ثوانٍ.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═════════════ الإعدادات (كلها في مكان واحد) ═════════════ */
+const CFG = {
+  // نفس رابط البلاغات المستخدم في الداشبورد (BALAGH_URL في dashboard.js)
+  BALAGH_URL: "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec",
+  // نفس خريطة المحافظة → المنطقة في تبويب البلاغات (BALAGH_SECTOR_TO_REGION)
+  SECTOR_TO_REGION: {
+    "مكة المكرمة":"مكة المكرمة","القنفذة":"مكة المكرمة","الليث":"مكة المكرمة",
+    "المدينة المنورة":"المدينة المنورة","ينبع":"المدينة المنورة","العلا":"المدينة المنورة","المهد":"المدينة المنورة",
+    "جدة":"جدة","الطائف":"الطائف"
+  },
+  COL_SECTOR:"المحافظة التابع لها المدرسة", COL_CREATED:"تاريخ الإنشاء", COL_SLA:"حالة SLA",
+  BREACH:"تم اختراقه", PASS:"ضمن SLA",
+  SERIES:[ // بنفس ترتيب الباوربوينت
+    {k:"جدة",           color:"#1a3358", w:3},
+    {k:"مكة المكرمة",   color:"#86a894", tc:"#5b8a73", w:3},
+    {k:"المدينة المنورة",color:"#e0a050", tc:"#c27512", w:3},
+    {k:"الطائف",        color:"#7b5ea7", tc:"#6a4a98", w:3},
+    {k:"المنطقة الغربية",color:"#c0392b", tc:"#b0261a", w:6.5, west:true}
+  ],
+  MAX_WEEKS:10,
+  POLL_SEC: Math.max(5, +(new URLSearchParams(location.search).get("poll")||60)), // تحديث تلقائي صامت كل دقيقة
+  CACHE_KEY:"sla_report_cache_v1"
+};
+const REGIONS = CFG.SERIES.filter(s=>!s.west).map(s=>s.k);
+const WEST = CFG.SERIES.find(s=>s.west).k;
+const $ = id => document.getElementById(id);
+
+/* ═════════════ أدوات التواريخ (أسبوع من السبت إلى الجمعة مثل الباوربوينت) ═════════════ */
+const AR_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const DAY = 86400000;
+const qs = new URLSearchParams(location.search);
+function startOfToday(){
+  const a = qs.get("asof"); // للتجربة فقط: ?asof=2026-04-30
+  const d = a ? new Date(a+"T00:00:00") : new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function weekStartOf(d){ // السبت = بداية الأسبوع
+  const dow = (d.getDay()+1)%7;           // السبت 0 … الجمعة 6
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+}
+const addDays=(d,n)=>new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+const dm=d=>d.getDate()+"/"+(d.getMonth()+1);
+const dmy=d=>d.getDate()+" "+AR_MONTHS[d.getMonth()];
+const keyOf=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const fromKey=k=>{const p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]);};
+const A2E=s=>String(s).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d));
+const norm=v=>String(v==null?"":v).replace(/﻿/g,"").trim();
+
+/* نفس منطق parseBalaghDate في الداشبورد، مع دعم Date/رقم Excel */
+function parseDate(v){
+  if(v instanceof Date) return isNaN(v)?null:new Date(v.getFullYear(),v.getMonth(),v.getDate());
+  if(typeof v==="number" && v>20000 && v<80000){ const d=new Date(Math.round((v-25569)*DAY)); return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()); }
+  const s=A2E(norm(v)).replace(/[‎‏]/g,"").trim();
+  if(!s||/^#+$/.test(s)) return null;
+  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m){ let d=+m[1],mo=+m[2]; if(mo>12&&d<=12)[d,mo]=[mo,d]; if(mo>=1&&mo<=12) return new Date(+m[3],mo-1,d); }
+  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(s); return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+
+/* ═════════════ التجميع الأسبوعي (n = كل البلاغات، b = تم اختراقه، p = ضمن SLA) ═════════════
+   نحسب فقط آخر 10 أسابيع مكتملة (الأسبوع الحالي غير المكتمل لا يدخل) لتخفيف الحساب */
+function weekWindow(){
+  const today=startOfToday();
+  const cur=weekStartOf(today);                 // بداية الأسبوع الحالي (غير مكتمل دائمًا)
+  const last=addDays(cur,-7);                   // آخر أسبوع مكتمل
+  const first=addDays(last,-7*(CFG.MAX_WEEKS-1));
+  return {first,last,cur};
+}
+function aggregate(rows){
+  const W=weekWindow(), t0=W.first.getTime(), t1=W.cur.getTime();
+  const weeks={}; let used=0;
+  for(const r of rows){
+    const d=parseDate(r[CFG.COL_CREATED]);
+    if(!d) continue;
+    const t=d.getTime(); if(t<t0||t>=t1) continue;
+    const region=CFG.SECTOR_TO_REGION[norm(r[CFG.COL_SECTOR])];
+    if(!region) continue;
+    const k=keyOf(weekStartOf(d));
+    const w=weeks[k]||(weeks[k]={});
+    const o=w[region]||(w[region]={n:0,b:0,p:0});
+    const s=norm(r[CFG.COL_SLA]);
+    o.n++; if(s===CFG.BREACH)o.b++; else if(s===CFG.PASS)o.p++;
+    used++;
+  }
+  return {weeks, used, total:rows.length, builtAt:Date.now()};
+}
+/* الرد المجمَّع من السيرفر (?weeks=10): صفوف [بداية الأسبوع، المحافظة، حالة SLA، العدد] */
+function aggregateFromAgg(list, total){
+  const W=weekWindow(), t0=W.first.getTime(), t1=W.cur.getTime();
+  const weeks={}; let used=0;
+  for(const g of list){
+    const wk=fromKey(String(g[0])); const t=wk.getTime();
+    if(isNaN(t)||t<t0||t>=t1) continue;
+    const region=CFG.SECTOR_TO_REGION[norm(g[1])]; if(!region) continue;
+    const c=+g[3]||0; if(!c) continue;
+    const w=weeks[keyOf(wk)]||(weeks[keyOf(wk)]={});
+    const o=w[region]||(w[region]={n:0,b:0,p:0});
+    const s=norm(g[2]);
+    o.n+=c; if(s===CFG.BREACH)o.b+=c; else if(s===CFG.PASS)o.p+=c;
+    used+=c;
+  }
+  return {weeks, used, total:total||used, builtAt:Date.now()};
+}
+function pct(o,mode){
+  if(!o||!o.n) return null;
+  if(mode==="eval"){ const den=o.p+o.b; return den? o.p/den*100 : null; }
+  return (o.n-o.b)/o.n*100;
+}
+
+/* ═════════════ الحالة العامة ═════════════ */
+const S={agg:null, sig:"", n:8, mode:"tab", hidden:{}, notice:"", tbl:null};
+let chart=null;
+
+function completeWeeks(){
+  if(!S.agg) return [];
+  const W=weekWindow(), keys=Object.keys(S.agg.weeks).sort();
+  if(!keys.length) return [];
+  let first=fromKey(keys[0]); if(first<W.first) first=W.first;
+  const out=[];
+  for(let d=first; d<=W.last; d=addDays(d,7)) out.push(d);
+  return out;
+}
+
+function sumWest(w){
+  const t={n:0,b:0,p:0};
+  if(!w) return t;
+  for(const r of REGIONS){ const o=w[r]; if(o){t.n+=o.n;t.b+=o.b;t.p+=o.p;} }
+  return t;
+}
+
+/* ═════════════ الرسم ═════════════ */
+const labelPlugin={
+  id:"valueLabels",
+  afterDatasetsDraw(ch){
+    if(!ch.$labels) return;
+    const {ctx,chartArea:ca}=ch;
+    const pts=[], segs=[];
+    ch.data.datasets.forEach((ds,di)=>{
+      if(!ch.isDatasetVisible(di)) return;
+      const meta=ch.getDatasetMeta(di);
+      const arr=meta.data.map((pt,i)=>{ const v=ds.data[i]; return (v==null||isNaN(v))?null:{x:pt.x,y:pt.y,i,di,v,west:!!ds.$west,color:ds.$tc||ds.borderColor,r:ds.$west?8:5.5}; });
+      arr.forEach((p,i)=>{ if(p) pts.push(p); if(p&&arr[i+1]) segs.push([p,arr[i+1]]); });
+    });
+    // عينات نقاط على الخطوط لتفادي كتابة الرقم فوق خط
+    const samples=[];
+    segs.forEach(([a,b])=>{ const L=Math.hypot(b.x-a.x,b.y-a.y), n=Math.max(2,Math.ceil(L/5));
+      for(let k=0;k<=n;k++) samples.push({x:a.x+(b.x-a.x)*k/n,y:a.y+(b.y-a.y)*k/n}); });
+    // ترتيب الوضع: المنطقة الغربية أولًا (تأخذ أفضل مكان) ثم الباقي من الأعلى للأسفل في كل أسبوع
+    const byWeek={}; pts.forEach(p=>(byWeek[p.i]=byWeek[p.i]||[]).push(p));
+    Object.values(byWeek).forEach(l=>{ l.sort((a,b)=>a.y-b.y); l.forEach((p,k)=>{ p.rank=k; p.cnt=l.length; }); });
+    const order=pts.slice().sort((a,b)=>(b.west-a.west)||(a.i-b.i)||(a.y-b.y));
+    const placed=[];
+    ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineJoin="round";
+    const hit=(bx,q,pad)=>q.x>bx.x-pad&&q.x<bx.x+bx.w+pad&&q.y>bx.y-pad&&q.y<bx.y+bx.h+pad;
+    order.forEach(p=>{
+      const fs=p.west?15.5:13.5, H=fs+5;
+      ctx.font=(p.west?"900 ":"800 ")+fs+"px Tajawal, sans-serif";
+      const text=p.v.toFixed(1)+"%", w=ctx.measureText(text).width+8;
+      const up=(p.rank<=(p.cnt-1)/2); // النصف الأعلى يفضّل الكتابة فوق، والأسفل تحت
+      const g=p.r+H/2+3;
+      const cands=[];
+      [[0,-g],[0,g],[0,-g-H],[0,g+H],[0,-g-2*H],[0,g+2*H]].forEach(c=>cands.push(c));
+      const sx=w/2+p.r+4;
+      [[sx,0],[-sx,0],[sx,-H*0.7],[-sx,-H*0.7],[sx,H*0.7],[-sx,H*0.7],[sx*0.62,-g],[-sx*0.62,-g],[sx*0.62,g],[-sx*0.62,g]].forEach(c=>cands.push(c));
+      let best=null, bestScore=1e9;
+      cands.forEach((c,ci)=>{
+        const bx={x:p.x+c[0]-w/2,y:p.y+c[1]-H/2,w:w,h:H};
+        let sc=Math.hypot(c[0],c[1])*0.25+ci*0.4;
+        if((c[1]<0)!==up && c[1]!==0) sc+=5;
+        if(bx.y<ca.top-14||bx.y+H>ca.bottom+14||bx.x<ca.left-34||bx.x+w>ch.width-1) sc+=5000;
+        placed.forEach(o=>{ if(bx.x<o.x+o.w+2&&bx.x+bx.w>o.x-2&&bx.y<o.y+o.h&&bx.y+bx.h>o.y) sc+=1000; });
+        pts.forEach(q=>{ if(q!==p || true){ if(hit(bx,q,q.r)) sc+=(q===p?900:450); } });
+        let on=0; for(const q of samples){ if(hit(bx,q,1.5)) on++; }
+        sc+=Math.min(on,12)*9;
+        if(sc<bestScore){ bestScore=sc; best={bx,c}; }
+      });
+      placed.push(best.bx);
+      const tx=p.x+best.c[0], ty=p.y+best.c[1]+0.5;
+      ctx.lineWidth=p.west?5:4; ctx.strokeStyle="rgba(255,255,255,.96)"; ctx.strokeText(text,tx,ty);
+      ctx.fillStyle=p.color; ctx.fillText(text,tx,ty);
+    });
+    ctx.restore();
+  }
+};
+
+function render(){
+  const NARROW=window.innerWidth<700;
+  const weeks=completeWeeks();
+  const mode=S.mode;
+  if(!weeks.length){ showMsg("لا توجد أسابيع مكتملة", "لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
+  hideOverlay();
+  let list=weeks.slice(-Math.min(S.n,CFG.MAX_WEEKS));
+  const labels=list.map(s=>dm(s)+"–"+dm(addDays(s,6)));
+  const ds=CFG.SERIES.map(sr=>{
+    const data=[], raw=[];
+    list.forEach(s=>{
+      const w=S.agg.weeks[keyOf(s)];
+      const o=sr.west?sumWest(w):(w&&w[sr.k]);
+      raw.push(o||{n:0,b:0,p:0});
+      data.push(pct(o,mode));
+    });
+    return {label:sr.k,data,raw,borderColor:sr.color,backgroundColor:sr.color,borderWidth:sr.w,pointRadius:sr.west?7.5:5,pointHoverRadius:sr.west?10:8,pointBorderColor:"#fff",pointBorderWidth:sr.west?2:1.5,pointBackgroundColor:sr.color,borderCapStyle:"round",borderJoinStyle:"round",
+            tension:0,spanGaps:false,$west:!!sr.west,$tc:sr.tc||sr.color,hidden:!!S.hidden[sr.k],order:sr.west?0:1};
+  });
+  // محور Y: يتكيّف مع القيم (مثل الباوربوينت 40–100)
+  const vals=ds.filter(d=>!d.hidden).flatMap(d=>d.data).filter(v=>v!=null);
+  let lo=vals.length?Math.floor((Math.min(...vals)-6)/10)*10:0; lo=Math.max(0,Math.min(lo,60));
+  const cfg={
+    type:"line",data:{labels,datasets:ds},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:350},
+      layout:{padding:{top:30,right:40,left:4,bottom:8}},
+      interaction:{mode:"index",intersect:false},
+      scales:{
+        y:{min:lo,max:100,ticks:{stepSize:10,callback:v=>v+"%",color:"#52707e",font:{family:"Tajawal",size:13,weight:"600"}},grid:{color:"#e3edf3"},border:{display:false}},
+        x:{offset:true,ticks:{color:"#2c5468",font:{family:"Tajawal",size:NARROW?10.5:13,weight:"700"},maxRotation:NARROW?55:0,minRotation:NARROW?55:0,autoSkip:false},grid:{color:"#eef3f7"},border:{color:"#d6e2ea"}}
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{rtl:true,textDirection:"rtl",titleFont:{family:"Tajawal",size:12.5,weight:"800"},bodyFont:{family:"Tajawal",size:12},
+          callbacks:{
+            title:items=>"الأسبوع "+items[0].label,
+            label:c=>{ if(c.raw==null) return c.dataset.label+": لا توجد بيانات"; const o=c.dataset.raw[c.dataIndex];
+              return c.dataset.label+": "+c.raw.toFixed(1)+"%  ("+o.n.toLocaleString("en")+" بلاغ، منها "+o.b.toLocaleString("en")+" مخترَق)"; }
+          }}
+      }
+    },
+    plugins:[labelPlugin]
+  };
+  buildTable(list,mode); buildKpis(list,mode); buildLegend();   // نبني العناصر المحيطة أولًا عشان المقاسات تثبت قبل رسم الشارت
+  if(chart){ chart.destroy(); }
+  const showLabels = true && $('cv').parentElement.clientWidth>=700;
+  chart=new Chart($("cv"),cfg); chart.$labels=showLabels;
+  // العنوان الفرعي
+  const a=list[0], b=addDays(list[list.length-1],6);
+  $("sub").textContent="الفترة: "+dmy(a)+(a.getFullYear()!==b.getFullYear()?" "+a.getFullYear():"")+" – "+dmy(b)+" "+b.getFullYear()+" · "+list.length+" "+(list.length===1?"أسبوع":"أسابيع")+" مكتملة";
+  buildLegend();
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(S.n)));
+  if(S.notice) banner(S.notice);
+  else if(S.n>weeks.length) banner("المتاح "+weeks.length+" أسبوعًا مكتملًا فقط، وتم عرض كل المتاح.");
+  else banner("");
+}
+function buildKpis(list,mode){
+  const lastW=list[list.length-1], prevW=list.length>1?list[list.length-2]:null;
+  const get=(sr,wk)=>{ if(!wk) return null; const w=S.agg.weeks[keyOf(wk)]; return pct(sr.west?sumWest(w):(w&&w[sr.k]),mode); };
+  const order=[...CFG.SERIES.filter(x=>x.west),...CFG.SERIES.filter(x=>!x.west)];
+  $("kpis").innerHTML=order.map(sr=>{
+    const v=get(sr,lastW), pv=get(sr,prevW);
+    let d='<span class="kd na">لا يوجد أسبوع سابق للمقارنة</span>';
+    if(v!=null&&pv!=null){ const x=v-pv, ax=Math.abs(x).toFixed(1);
+      d = Math.abs(x)<0.05 ? '<span class="kd eq">■ بدون تغيير عن الأسبوع السابق</span>'
+        : '<span class="kd '+(x>0?'up':'dn')+'">'+(x>0?'▲':'▼')+' '+ax+' نقطة عن الأسبوع السابق</span>'; }
+    return '<div class="kpi'+(sr.west?' west':'')+'" style="--kc:'+sr.color+';--kt:'+(sr.tc||sr.color)+'">'
+      +'<div class="kn"><i></i>'+sr.k+'</div>'
+      +'<div class="kv">'+(v==null?'—':v.toFixed(1)+'%')+'</div>'
+      +d+'<div class="kw">آخر أسبوع مكتمل: <span dir="ltr" style="unicode-bidi:isolate">'+dm(lastW)+'–'+dm(addDays(lastW,6))+'</span></div></div>';
+  }).join("");
+}
+function buildTable(list,mode){
+  const t=$("nums"); const hdr=list.map(s=>'<th>'+dm(s)+'–'+dm(addDays(s,6))+'</th>').join("");
+  let h='<tr><th class="rn">المنطقة</th>'+hdr+'</tr>';
+  CFG.SERIES.forEach(sr=>{
+    if(S.hidden[sr.k]) return;
+    h+='<tr'+(sr.west?' class="west"':'')+'><td class="rn"><i style="background:'+sr.color+'"></i>'+sr.k+'</td>';
+    list.forEach(s=>{
+      const w=S.agg.weeks[keyOf(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
+      h+= v==null? '<td class="na">—</td>' : '<td title="'+o.n.toLocaleString("en")+' بلاغ">'+v.toFixed(1)+'%</td>';
+    });
+    h+='</tr>';
+  });
+  t.innerHTML=h;
+  const show = S.tbl==null ? window.innerWidth<700 : S.tbl;
+  $("tblwrap").classList.toggle("show",show);
+  $("btnTbl").textContent = show ? "إخفاء جدول الأرقام" : "عرض جدول الأرقام";
+}
+function buildLegend(){
+  const lg=$("legend"); lg.innerHTML="";
+  CFG.SERIES.forEach(sr=>{
+    const e=document.createElement("div"); e.className="lg"+(sr.west?" west":"")+(S.hidden[sr.k]?" off":""); e.style.color=sr.color;
+    e.innerHTML='<i style="border-color:'+sr.color+'"></i><span style="color:#2c5468">'+sr.k+'</span>';
+    e.onclick=()=>{ S.hidden[sr.k]=!S.hidden[sr.k]; render(); };
+    lg.appendChild(e);
+  });
+}
+function banner(t){ const b=$("banner"); b.textContent=t; b.classList.toggle("show",!!t); }
+
+/* ═════════════ التحميل (دايمًا مباشرة من الشيت، بدون نسخ محفوظة) ═════════════ */
+const ERR_TXT="تأكد من الاتصال بالإنترنت";
+function showMsg(msg,det,isErr){
+  $("overlay").classList.add("show"); $("ovMsg").textContent=msg; $("ovDet").textContent=det||"";
+  $("ovDet").style.display=det?"block":"none"; $("spin").style.display=isErr?"none":"block";
+}
+function hideOverlay(){ $("overlay").classList.remove("show"); }
+function setDot(c){ $("dot").className="dot "+c; }
+function stamp(ts){ const d=new Date(ts); $("lastTime").textContent=d.toLocaleString("ar-EG-u-nu-latn",{dateStyle:"short",timeStyle:"short"}); }
+
+async function fetchOnce(url,ms){
+  const ac=("AbortController" in window)?new AbortController():null, t=ac?setTimeout(()=>ac.abort(),ms):null;
+  try{ const r=await fetch(url,{cache:"no-store",signal:ac?ac.signal:undefined}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+  finally{ if(t) clearTimeout(t); }
+}
+async function fetchJson(url,tries){
+  let err;
+  for(let i=0;i<tries;i++){
+    try{ return await fetchOnce(url,25000); }
+    catch(e){ err=e; if(i<tries-1) await new Promise(r=>setTimeout(r,900*(i+1))); }
+  }
+  throw err;
+}
+const dataUrl=()=>CFG.BALAGH_URL+(CFG.BALAGH_URL.includes("?")?"&":"?")+"weeks="+CFG.MAX_WEEKS;
+function toAgg(j){
+  if(!(j && j.status==="ok")) throw new Error("bad response");
+  if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.totalRows);
+  if(Array.isArray(j.data)) return aggregate(j.data);   // سيرفر قديم رجّع كل الصفوف
+  throw new Error("bad response");
+}
+const sigOf=a=>JSON.stringify(a.weeks)+"|"+keyOf(weekWindow().cur)+"|"+keyOf(startOfToday());
+/* نسخة محفوظة في المتصفح → الصفحة تظهر فورًا ثم تتحدّث (لو التخزين غير متاح بنكمل عادي) */
+function saveCache(){ try{ localStorage.setItem(CFG.CACHE_KEY,JSON.stringify({ts:Date.now(),agg:S.agg})); }catch(e){} }
+function loadCache(){
+  try{ const c=JSON.parse(localStorage.getItem(CFG.CACHE_KEY)||"null");
+    if(c&&c.agg&&c.agg.weeks&&Date.now()-c.ts<48*3600*1000) return c; }catch(e){}
+  return null;
+}
+let busy=false, lastCheck=0;
+async function load(silent,first){
+  if(busy) return; busy=true;
+  if(!silent){ setDot("loading"); $("btnReload").disabled=true; if(!S.agg) showMsg("جاري تحميل البلاغات…","قد يستغرق التحميل عدة ثوانٍ.",false); }
+  try{
+    let j=null;
+    if(first && window.__EARLY && window.__EARLY.u===dataUrl()){ j=await window.__EARLY.p; window.__EARLY=null; }
+    if(!j) j=await fetchJson(dataUrl(), silent?1:3);
+    const agg=toAgg(j);
+    const changed = !S.agg || sigOf(agg)!==S.sig || !!S.notice;
+    S.agg=agg; S.sig=sigOf(agg); S.notice=""; lastCheck=Date.now();
+    stamp(lastCheck); setDot("ok"); saveCache();
+    if(changed) render();
+  }catch(e){
+    console.warn("[SLA] load failed",e);
+    setDot("err");
+    if(S.agg){ if(!S.notice){ S.notice=ERR_TXT; render(); } }   // نسيب آخر رسم ظاهر ونعرض الجملة فقط
+    else showMsg(ERR_TXT,"",true);
+  }finally{ busy=false; $("btnReload").disabled=false; }
+}
+
+/* ═════════════ تصدير صورة ═════════════ */
+async function exportPng(){
+  const btn=$("btnPng"); btn.disabled=true;
+  try{
+    if(!window.html2canvas) await new Promise((ok,no)=>{ const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"; sc.onload=ok; sc.onerror=()=>no(new Error("html2canvas غير متاح")); document.head.appendChild(sc); });
+    const c=await html2canvas($("stage"),{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    const a=document.createElement("a"); a.download="SLA_compliance_"+keyOf(startOfToday())+".png"; a.href=c.toDataURL("image/png"); a.click();
+  }catch(e){
+    try{ const a=document.createElement("a"); a.download="SLA_chart.png"; a.href=$("cv").toDataURL("image/png"); a.click(); }catch(_){ alert("تعذّر التصدير: "+e.message); }
+  }finally{ btn.disabled=false; }
+}
+
+/* ═════════════ الأحداث ═════════════ */
+document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ S.n=+c.dataset.n; render(); });
+$("btnTbl").onclick=()=>{ const cur=S.tbl==null?window.innerWidth<700:S.tbl; S.tbl=!cur; if(S.agg) render(); };
+$("mode").onchange=e=>{ S.mode=e.target.value; render(); };
+$("btnReload").onclick=()=>load(false);
+$("btnPng").onclick=exportPng;
+window.addEventListener("resize",()=>{ if(chart) chart.resize(); });
+
+window.__SLA__={S,aggregate,pct,completeWeeks,render}; // للتجربة
+
+/* ═════════════ الإقلاع + التحديث الدائم ═════════════ */
+(function boot(){
+  const c=loadCache();
+  if(c){ S.agg=c.agg; S.sig=sigOf(c.agg); stamp(c.ts); try{ render(); }catch(e){ S.agg=null; } }   // عرض فوري من آخر نسخة
+  if(S.agg) setDot("loading");
+  load(!!S.agg,true);
+  setInterval(()=>{ if(!document.hidden) load(true); }, CFG.POLL_SEC*1000);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Date.now()-lastCheck>20000) load(true); });
+  window.addEventListener("online",()=>load(true));
+})();
+})();
+</script>
+</body>
+</html>
