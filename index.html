@@ -528,13 +528,14 @@ async function fetchOnce(url,ms){
 async function fetchJson(url,tries){
   let err;
   for(let i=0;i<tries;i++){
-    try{ return await fetchOnce(url,25000); }
+    try{ return await fetchOnce(url,40000); }
     catch(e){ err=e; if(i<tries-1) await new Promise(r=>setTimeout(r,900*(i+1))); }
   }
   throw err;
 }
 const dataUrl=()=>CFG.BALAGH_URL+(CFG.BALAGH_URL.includes("?")?"&":"?")+"weeks="+CFG.MAX_WEEKS;
 function toAgg(j){
+  if(j && j.status==="building"){ const e=new Error("building"); e.building=true; throw e; }   // السيرفر بيجهّز النتيجة (أول مرة بعد النشر)
   if(!(j && j.status==="ok")) throw new Error("bad response");
   if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.nagg, j.totalRows);
   if(Array.isArray(j.data)) return aggregate(j.data);   // سيرفر قديم رجّع كل الصفوف
@@ -562,6 +563,10 @@ async function load(silent,first){
     stamp(lastCheck); setDot("ok"); saveCache();
     if(changed) render();
   }catch(e){
+    if(e && e.building){   // مش خطأ: نكمّل انتظار ونعيد المحاولة كل 4 ثواني
+      if(!S.agg) showMsg("جاري تحميل البلاغات…","التجهيز الأول بياخد وقت قصير، ومن بعده بيفتح فورًا.",false);
+      busy=false; $("btnReload").disabled=false; setTimeout(()=>load(silent),4000); return;
+    }
     console.warn("[SLA] load failed",e);
     setDot("err");
     if(S.agg){ if(!S.notice){ S.notice=ERR_TXT; render(); } }   // نسيب آخر رسم ظاهر ونعرض الجملة فقط
