@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تقرير الالتزام بـ SLA – المنطقة الغربية</title>
+<title>تقرير الالتزام بـ NEW SLA – المنطقة الغربية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://script.google.com" crossorigin>
@@ -152,7 +152,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
     <div class="tb-divider"></div>
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" style="height:36px">
     <div class="tb-divider"></div>
-    <div class="tb-title" style="padding:0">تقرير الالتزام بـ SLA</div>
+    <div class="tb-title" id="tbTitle" style="padding:0">تقرير الالتزام بـ NEW SLA</div>
   </div>
   <div class="tb-right">
     <div class="dot loading" id="dot"></div>
@@ -166,7 +166,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
   <div class="stage" id="stage">
     <div class="hd">
       <div>
-        <h1>نسبة الالتزام بـ SLA أسبوعياً – المناطق الأربع والمنطقة الغربية</h1>
+        <h1><span id="ttl">نسبة الالتزام بـ NEW SLA</span> أسبوعياً – المناطق الأربع والمنطقة الغربية</h1>
         <div class="sub" id="sub">—</div>
       </div>
       <div class="filters" id="filters" data-html2canvas-ignore="true">
@@ -183,7 +183,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
     <div class="kpis" id="kpis"></div>
 
     <div class="card">
-      <div class="card-hd"><span class="pt"></span>نسبة الالتزام بـ SLA <small>تاريخ الأسبوع: يوم/شهر</small></div>
+      <div class="card-hd"><span class="pt"></span><span id="cardTtl">نسبة الالتزام بـ NEW SLA</span> <small>تاريخ الأسبوع: يوم/شهر</small></div>
       <div class="chartbox"><canvas id="cv"></canvas></div>
       <div class="legend" id="legend"></div>
     </div>
@@ -193,6 +193,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
     <div class="foot">
       <div data-html2canvas-ignore="true" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="chip" id="btnTbl" type="button">عرض جدول الأرقام</button><span>طريقة الحساب:</span>
         <select id="mode">
+          <option value="new" selected>NEW SLA (كما في تبويب NEW SLA): «ملتزم» ÷ («ملتزم» + «اختراق») للبلاغات المصنّفة P1–P4</option>
           <option value="tab">كما في تبويب البلاغات: (الكل − «تم اختراقه») ÷ الكل</option>
           <option value="eval">المُقيَّم فقط: «ضمن SLA» ÷ («ضمن SLA» + «تم اختراقه»)</option>
         </select>
@@ -232,7 +233,7 @@ const CFG = {
   ],
   MAX_WEEKS:10,
   POLL_SEC: Math.max(5, +(new URLSearchParams(location.search).get("poll")||60)), // تحديث تلقائي صامت كل دقيقة
-  CACHE_KEY:"sla_report_cache_v1"
+  CACHE_KEY:"sla_report_cache_v2"
 };
 const REGIONS = CFG.SERIES.filter(s=>!s.west).map(s=>s.k);
 const WEST = CFG.SERIES.find(s=>s.west).k;
@@ -281,6 +282,7 @@ function weekWindow(){
   const first=addDays(last,-7*(CFG.MAX_WEEKS-1));
   return {first,last,cur};
 }
+const mkO=()=>({n:0,b:0,p:0,nc:0,nb:0,nbo:0,np:0});
 function aggregate(rows){
   const W=weekWindow(), t0=W.first.getTime(), t1=W.cur.getTime();
   const weeks={}; let used=0;
@@ -292,38 +294,44 @@ function aggregate(rows){
     if(!region) continue;
     const k=keyOf(weekStartOf(d));
     const w=weeks[k]||(weeks[k]={});
-    const o=w[region]||(w[region]={n:0,b:0,p:0});
+    const o=w[region]||(w[region]=mkO());
     const s=norm(r[CFG.COL_SLA]);
     o.n++; if(s===CFG.BREACH)o.b++; else if(s===CFG.PASS)o.p++;
     used++;
   }
   return {weeks, used, total:rows.length, builtAt:Date.now()};
 }
-/* الرد المجمَّع من السيرفر (?weeks=10): صفوف [بداية الأسبوع، المحافظة، حالة SLA، العدد] */
-function aggregateFromAgg(list, total){
+/* الرد المجمَّع من السيرفر (?weeks=10):
+   agg  = [بداية الأسبوع، المحافظة، حالة SLA (تبويب البلاغات)، العدد]
+   nagg = [بداية الأسبوع، المحافظة، حالة NEW SLA (compliant|breach|breach_open|pending)، العدد] */
+function aggregateFromAgg(list, nlist, total){
   const W=weekWindow(), t0=W.first.getTime(), t1=W.cur.getTime();
   const weeks={}; let used=0;
-  for(const g of list){
-    const wk=fromKey(String(g[0])); const t=wk.getTime();
-    if(isNaN(t)||t<t0||t>=t1) continue;
-    const region=CFG.SECTOR_TO_REGION[norm(g[1])]; if(!region) continue;
-    const c=+g[3]||0; if(!c) continue;
+  const slot=(g)=>{ const wk=fromKey(String(g[0])); const t=wk.getTime();
+    if(isNaN(t)||t<t0||t>=t1) return null;
+    const region=CFG.SECTOR_TO_REGION[norm(g[1])]; if(!region) return null;
+    const c=+g[3]||0; if(!c) return null;
     const w=weeks[keyOf(wk)]||(weeks[keyOf(wk)]={});
-    const o=w[region]||(w[region]={n:0,b:0,p:0});
-    const s=norm(g[2]);
-    o.n+=c; if(s===CFG.BREACH)o.b+=c; else if(s===CFG.PASS)o.p+=c;
-    used+=c;
-  }
-  return {weeks, used, total:total||used, builtAt:Date.now()};
+    return {o:w[region]||(w[region]=mkO()), c, s:norm(g[2])}; };
+  for(const g of list){ const x=slot(g); if(!x) continue;
+    x.o.n+=x.c; if(x.s===CFG.BREACH)x.o.b+=x.c; else if(x.s===CFG.PASS)x.o.p+=x.c; used+=x.c; }
+  const hasNew=Array.isArray(nlist);
+  if(hasNew) for(const g of nlist){ const x=slot(g); if(!x) continue;
+    if(x.s==="compliant")x.o.nc+=x.c; else if(x.s==="breach")x.o.nb+=x.c; else if(x.s==="breach_open")x.o.nbo+=x.c; else if(x.s==="pending")x.o.np+=x.c; }
+  return {weeks, used, total:total||used, hasNew, builtAt:Date.now()};
 }
+/* NEW SLA (نفس تبويب NEW SLA): الملتزم ÷ (الملتزم + الاختراق المغلق + الاختراق الحالي)، المُقيَّم فقط */
 function pct(o,mode){
-  if(!o||!o.n) return null;
+  if(!o) return null;
+  if(mode==="new"){ const den=(o.nc||0)+(o.nb||0)+(o.nbo||0); return den? (o.nc||0)/den*100 : null; }
+  if(!o.n) return null;
   if(mode==="eval"){ const den=o.p+o.b; return den? o.p/den*100 : null; }
   return (o.n-o.b)/o.n*100;
 }
 
 /* ═════════════ الحالة العامة ═════════════ */
-const S={agg:null, sig:"", n:8, mode:"tab", hidden:{}, notice:"", tbl:null};
+const cnt=(o,mode)=> mode==="new" ? {n:(o.nc||0)+(o.nb||0)+(o.nbo||0), b:(o.nb||0)+(o.nbo||0)} : {n:o.n,b:o.b};
+const S={agg:null, sig:"", n:8, mode:"new", hidden:{}, notice:"", tbl:null};
 let chart=null;
 
 function completeWeeks(){
@@ -337,9 +345,9 @@ function completeWeeks(){
 }
 
 function sumWest(w){
-  const t={n:0,b:0,p:0};
+  const t=mkO();
   if(!w) return t;
-  for(const r of REGIONS){ const o=w[r]; if(o){t.n+=o.n;t.b+=o.b;t.p+=o.p;} }
+  for(const r of REGIONS){ const o=w[r]; if(o){ for(const k in t) t[k]+=(o[k]||0); } }
   return t;
 }
 
@@ -411,7 +419,7 @@ function render(){
     list.forEach(s=>{
       const w=S.agg.weeks[keyOf(s)];
       const o=sr.west?sumWest(w):(w&&w[sr.k]);
-      raw.push(o||{n:0,b:0,p:0});
+      raw.push(o||mkO());
       data.push(pct(o,mode));
     });
     return {label:sr.k,data,raw,borderColor:sr.color,backgroundColor:sr.color,borderWidth:sr.w,pointRadius:sr.west?7.5:5,pointHoverRadius:sr.west?10:8,pointBorderColor:"#fff",pointBorderWidth:sr.west?2:1.5,pointBackgroundColor:sr.color,borderCapStyle:"round",borderJoinStyle:"round",
@@ -436,7 +444,7 @@ function render(){
           callbacks:{
             title:items=>"الأسبوع "+items[0].label,
             label:c=>{ if(c.raw==null) return c.dataset.label+": لا توجد بيانات"; const o=c.dataset.raw[c.dataIndex];
-              return c.dataset.label+": "+c.raw.toFixed(1)+"%  ("+o.n.toLocaleString("en")+" بلاغ، منها "+o.b.toLocaleString("en")+" مخترَق)"; }
+              const q=cnt(o,mode); return c.dataset.label+": "+c.raw.toFixed(1)+"%  ("+q.n.toLocaleString("en")+(mode==="new"?" بلاغ مُقيَّم، منها ":" بلاغ، منها ")+q.b.toLocaleString("en")+" مخترَق)"; }
           }}
       }
     },
@@ -451,7 +459,10 @@ function render(){
   $("sub").textContent="الفترة: "+dmy(a)+(a.getFullYear()!==b.getFullYear()?" "+a.getFullYear():"")+" – "+dmy(b)+" "+b.getFullYear()+" · "+list.length+" "+(list.length===1?"أسبوع":"أسابيع")+" مكتملة";
   buildLegend();
   document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(S.n)));
-  if(S.notice) banner(S.notice);
+  const SL=mode==="new"?"NEW SLA":"SLA";
+  $("ttl").textContent="نسبة الالتزام بـ "+SL; $("cardTtl").textContent="نسبة الالتزام بـ "+SL; $("tbTitle").textContent="تقرير الالتزام بـ "+SL; document.title="تقرير الالتزام بـ "+SL+" – المنطقة الغربية";
+  if(mode==="new" && !S.agg.hasNew) banner("لعرض NEW SLA لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة.");
+  else if(S.notice) banner(S.notice);
   else if(S.n>weeks.length) banner("المتاح "+weeks.length+" أسبوعًا مكتملًا فقط، وتم عرض كل المتاح.");
   else banner("");
 }
@@ -479,7 +490,7 @@ function buildTable(list,mode){
     h+='<tr'+(sr.west?' class="west"':'')+'><td class="rn"><i style="background:'+sr.color+'"></i>'+sr.k+'</td>';
     list.forEach(s=>{
       const w=S.agg.weeks[keyOf(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
-      h+= v==null? '<td class="na">—</td>' : '<td title="'+o.n.toLocaleString("en")+' بلاغ">'+v.toFixed(1)+'%</td>';
+      h+= v==null? '<td class="na">—</td>' : '<td title="'+cnt(o,mode).n.toLocaleString("en")+(mode==="new"?' بلاغ مُقيَّم':' بلاغ')+'">'+v.toFixed(1)+'%</td>';
     });
     h+='</tr>';
   });
@@ -525,7 +536,7 @@ async function fetchJson(url,tries){
 const dataUrl=()=>CFG.BALAGH_URL+(CFG.BALAGH_URL.includes("?")?"&":"?")+"weeks="+CFG.MAX_WEEKS;
 function toAgg(j){
   if(!(j && j.status==="ok")) throw new Error("bad response");
-  if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.totalRows);
+  if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.nagg, j.totalRows);
   if(Array.isArray(j.data)) return aggregate(j.data);   // سيرفر قديم رجّع كل الصفوف
   throw new Error("bad response");
 }
