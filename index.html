@@ -74,6 +74,10 @@ body{
   border-radius:999px;padding:5px 14px;cursor:pointer;transition:.15s}
 .chip:hover{border-color:var(--teal);color:var(--teal-3)}
 .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg{display:inline-flex;background:var(--bg-2);border:1.5px solid var(--bd);border-radius:999px;padding:2px;margin-inline-end:8px}
+.seg button{font-family:Tajawal;font-size:12.5px;font-weight:800;color:var(--tx-sec);background:transparent;border:0;border-radius:999px;padding:4px 16px;cursor:pointer;transition:.15s}
+.seg button.on{background:var(--teal-3);color:#fff}
+.seg button:not(.on):hover{color:var(--teal-3)}
 .card{
   flex:1 0 auto;display:flex;flex-direction:column;min-height:0;margin-top:14px;border:1px solid var(--bd);border-radius:16px;
   background:#fff;padding:12px 18px 8px;
@@ -166,15 +170,24 @@ table.nums td.na{color:#9aaab4;font-weight:500}
   <div class="stage" id="stage">
     <div class="hd">
       <div>
-        <h1><span id="ttl">نسبة الالتزام بـ NEW SLA</span> أسبوعياً – المناطق الأربع والمنطقة الغربية</h1>
+        <h1><span id="ttl">نسبة الالتزام بـ NEW SLA</span> <span id="granTxt">أسبوعياً</span> – المناطق الأربع والمنطقة الغربية</h1>
         <div class="sub" id="sub">—</div>
       </div>
       <div class="filters" id="filters" data-html2canvas-ignore="true">
-        <span class="lbl">عدد الأسابيع:</span>
-        <button class="chip" data-n="4">آخر 4</button>
-        <button class="chip" data-n="6">آخر 6</button>
-        <button class="chip on" data-n="8">آخر 8</button>
-        <button class="chip" data-n="10">آخر 10</button>
+        <div class="seg" id="gran"><button type="button" data-g="w" class="on">أسبوعي</button><button type="button" data-g="d">يومي</button></div>
+        <span class="lbl" id="flbl">عدد الأسابيع:</span>
+        <span id="chipsW" style="display:inline-flex;gap:6px;flex-wrap:wrap">
+          <button class="chip" data-n="4">آخر 4</button>
+          <button class="chip" data-n="6">آخر 6</button>
+          <button class="chip on" data-n="8">آخر 8</button>
+          <button class="chip" data-n="10">آخر 10</button>
+        </span>
+        <span id="chipsD" style="display:none;gap:6px;flex-wrap:wrap">
+          <button class="chip" data-n="7">آخر 7 أيام</button>
+          <button class="chip on" data-n="14">آخر 14 يومًا</button>
+          <button class="chip" data-n="21">آخر 21 يومًا</button>
+          <button class="chip" data-n="30">آخر 30 يومًا</button>
+        </span>
       </div>
     </div>
 
@@ -183,7 +196,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
     <div class="kpis" id="kpis"></div>
 
     <div class="card">
-      <div class="card-hd"><span class="pt"></span><span id="cardTtl">نسبة الالتزام بـ NEW SLA</span> <small>تاريخ الأسبوع: يوم/شهر</small></div>
+      <div class="card-hd"><span class="pt"></span><span id="cardTtl">نسبة الالتزام بـ NEW SLA</span> <small id="cardHint">تاريخ الأسبوع: يوم/شهر</small></div>
       <div class="chartbox"><canvas id="cv"></canvas></div>
       <div class="legend" id="legend"></div>
     </div>
@@ -231,9 +244,9 @@ const CFG = {
     {k:"الطائف",        color:"#7b5ea7", tc:"#6a4a98", w:3},
     {k:"المنطقة الغربية",color:"#c0392b", tc:"#b0261a", w:6.5, west:true}
   ],
-  MAX_WEEKS:10,
+  MAX_WEEKS:10, MAX_DAYS:30,
   POLL_SEC: Math.max(5, +(new URLSearchParams(location.search).get("poll")||60)), // تحديث تلقائي صامت كل دقيقة
-  CACHE_KEY:"sla_report_cache_v2"
+  CACHE_KEY:"sla_report_cache_v3"
 };
 const REGIONS = CFG.SERIES.filter(s=>!s.west).map(s=>s.k);
 const WEST = CFG.SERIES.find(s=>s.west).k;
@@ -242,6 +255,7 @@ const $ = id => document.getElementById(id);
 /* ═════════════ أدوات التواريخ (أسبوع من السبت إلى الجمعة مثل الباوربوينت) ═════════════ */
 const AR_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 const DAY = 86400000;
+const DOW = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 const qs = new URLSearchParams(location.search);
 function startOfToday(){
   const a = qs.get("asof"); // للتجربة فقط: ?asof=2026-04-30
@@ -304,7 +318,7 @@ function aggregate(rows){
 /* الرد المجمَّع من السيرفر (?weeks=10):
    agg  = [بداية الأسبوع، المحافظة، حالة SLA (تبويب البلاغات)، العدد]
    nagg = [بداية الأسبوع، المحافظة، حالة NEW SLA (compliant|breach|breach_open|pending)، العدد] */
-function aggregateFromAgg(list, nlist, total){
+function aggregateFromAgg(list, nlist, total, dlist, dnlist, meta){
   const W=weekWindow(), t0=W.first.getTime(), t1=W.cur.getTime();
   const weeks={}; let used=0;
   const slot=(g)=>{ const wk=fromKey(String(g[0])); const t=wk.getTime();
@@ -318,7 +332,24 @@ function aggregateFromAgg(list, nlist, total){
   const hasNew=Array.isArray(nlist);
   if(hasNew) for(const g of nlist){ const x=slot(g); if(!x) continue;
     if(x.s==="compliant")x.o.nc+=x.c; else if(x.s==="breach")x.o.nb+=x.c; else if(x.s==="breach_open")x.o.nbo+=x.c; else if(x.s==="pending")x.o.np+=x.c; }
-  return {weeks, used, total:total||used, hasNew, builtAt:Date.now()};
+  /* العرض اليومي: dagg/dnagg = [اليوم 'yyyy-MM-dd', المحافظة, الحالة, العدد] لأيام مكتملة (حتى أمس) */
+  const days={}; const hasDaily=Array.isArray(dlist);
+  let dFrom=null, dLast=null;
+  if(hasDaily){
+    dLast=meta&&meta.dto?fromKey(String(meta.dto)):addDays(startOfToday(),-1);
+    dFrom=meta&&meta.dfrom?fromKey(String(meta.dfrom)):addDays(dLast,-(CFG.MAX_DAYS-1));
+    const dslot=(g)=>{ const dd=fromKey(String(g[0])); const t=dd.getTime();
+      if(isNaN(t)||t<dFrom.getTime()||t>dLast.getTime()) return null;
+      const region=CFG.SECTOR_TO_REGION[norm(g[1])]; if(!region) return null;
+      const c=+g[3]||0; if(!c) return null;
+      const w=days[keyOf(dd)]||(days[keyOf(dd)]={});
+      return {o:w[region]||(w[region]=mkO()), c, s:norm(g[2])}; };
+    for(const g of dlist){ const x=dslot(g); if(!x) continue;
+      x.o.n+=x.c; if(x.s===CFG.BREACH)x.o.b+=x.c; else if(x.s===CFG.PASS)x.o.p+=x.c; }
+    if(Array.isArray(dnlist)) for(const g of dnlist){ const x=dslot(g); if(!x) continue;
+      if(x.s==="compliant")x.o.nc+=x.c; else if(x.s==="breach")x.o.nb+=x.c; else if(x.s==="breach_open")x.o.nbo+=x.c; else if(x.s==="pending")x.o.np+=x.c; }
+  }
+  return {weeks, used, total:total||used, hasNew, days, hasDaily, dFrom:dFrom&&keyOf(dFrom), dLast:dLast&&keyOf(dLast), builtAt:Date.now()};
 }
 /* NEW SLA (نفس تبويب NEW SLA): الملتزم ÷ (الملتزم + الاختراق المغلق + الاختراق الحالي)، المُقيَّم فقط */
 function pct(o,mode){
@@ -331,7 +362,7 @@ function pct(o,mode){
 
 /* ═════════════ الحالة العامة ═════════════ */
 const cnt=(o,mode)=> mode==="new" ? {n:(o.nc||0)+(o.nb||0)+(o.nbo||0), b:(o.nb||0)+(o.nbo||0)} : {n:o.n,b:o.b};
-const S={agg:null, sig:"", n:8, mode:"new", hidden:{}, notice:"", tbl:null};
+const S={agg:null, sig:"", n:8, nd:14, gran:"w", mode:"new", hidden:{}, notice:"", tbl:null};
 let chart=null;
 
 function completeWeeks(){
@@ -344,6 +375,31 @@ function completeWeeks(){
   return out;
 }
 
+function completeDays(){
+  if(!S.agg||!S.agg.hasDaily||!S.agg.dLast) return [];
+  const last=fromKey(S.agg.dLast), first0=fromKey(S.agg.dFrom);
+  const keys=Object.keys(S.agg.days).sort();
+  if(!keys.length) return [];
+  let first=fromKey(keys[0]); if(first<first0) first=first0;
+  const out=[];
+  for(let d=first; d<=last; d=addDays(d,1)) out.push(d);
+  return out;
+}
+/* وحدة العرض: أسبوع (السبت→الجمعة) أو يوم — كل دوال الرسم والجدول والكروت تستخدمها */
+function U(){
+  if(S.gran==="d"){
+    const n=Math.min(S.nd,CFG.MAX_DAYS);
+    return {d:true, all:completeDays(), n, map:()=>S.agg.days,
+      lab:(d,len)=>len<=14?[DOW[d.getDay()],dm(d)]:dm(d), tip:d=>DOW[d.getDay()]+" "+dm(d)+"/"+d.getFullYear(),
+      cell:d=>DOW[d.getDay()]+" "+dm(d), titlePrefix:"", prevTxt:"اليوم السابق", lastTxt:"آخر يوم مكتمل", noPrev:"لا يوجد يوم سابق للمقارنة",
+      range:d=>DOW[d.getDay()]+" "+dm(d), word:"يوم", words:"أيام"};
+  }
+  const n=Math.min(S.n,CFG.MAX_WEEKS);
+  return {d:false, all:completeWeeks(), n, map:()=>S.agg.weeks,
+    lab:(s)=>dm(s)+"–"+dm(addDays(s,6)), tip:s=>"الأسبوع "+dm(s)+"–"+dm(addDays(s,6)),
+    cell:s=>dm(s)+"–"+dm(addDays(s,6)), prevTxt:"الأسبوع السابق", lastTxt:"آخر أسبوع مكتمل", noPrev:"لا يوجد أسبوع سابق للمقارنة",
+    range:s=>dm(s)+"–"+dm(addDays(s,6)), word:"أسبوع", words:"أسابيع"};
+}
 function sumWest(w){
   const t=mkO();
   if(!w) return t;
@@ -360,6 +416,7 @@ const labelPlugin={
     const pts=[], segs=[];
     ch.data.datasets.forEach((ds,di)=>{
       if(!ch.isDatasetVisible(di)) return;
+      if(ch.$onlyWest && !ds.$west) return;
       const meta=ch.getDatasetMeta(di);
       const arr=meta.data.map((pt,i)=>{ const v=ds.data[i]; return (v==null||isNaN(v))?null:{x:pt.x,y:pt.y,i,di,v,west:!!ds.$west,color:ds.$tc||ds.borderColor,r:ds.$west?8:5.5}; });
       arr.forEach((p,i)=>{ if(p) pts.push(p); if(p&&arr[i+1]) segs.push([p,arr[i+1]]); });
@@ -408,21 +465,25 @@ const labelPlugin={
 
 function render(){
   const NARROW=window.innerWidth<700;
-  const weeks=completeWeeks();
+  let fallback="";
+  if(S.gran==="d" && !(S.agg&&S.agg.hasDaily)){ S.gran="w"; fallback="لعرض اليومي لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة."; }
+  const u=U();
+  const weeks=u.all;
   const mode=S.mode;
-  if(!weeks.length){ showMsg("لا توجد أسابيع مكتملة", "لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
+  if(!weeks.length){ showMsg(u.d?"لا توجد أيام مكتملة":"لا توجد أسابيع مكتملة", u.d?"لا توجد بلاغات كافية لعرض يوم مكتمل واحد على الأقل.":"لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
   hideOverlay();
-  let list=weeks.slice(-Math.min(S.n,CFG.MAX_WEEKS));
-  const labels=list.map(s=>dm(s)+"–"+dm(addDays(s,6)));
+  let list=weeks.slice(-u.n);
+  const labels=list.map(s=>u.lab(s,list.length));
+  const many=u.d && list.length>14;
   const ds=CFG.SERIES.map(sr=>{
     const data=[], raw=[];
     list.forEach(s=>{
-      const w=S.agg.weeks[keyOf(s)];
+      const w=u.map()[keyOf(s)];
       const o=sr.west?sumWest(w):(w&&w[sr.k]);
       raw.push(o||mkO());
       data.push(pct(o,mode));
     });
-    return {label:sr.k,data,raw,borderColor:sr.color,backgroundColor:sr.color,borderWidth:sr.w,pointRadius:sr.west?7.5:5,pointHoverRadius:sr.west?10:8,pointBorderColor:"#fff",pointBorderWidth:sr.west?2:1.5,pointBackgroundColor:sr.color,borderCapStyle:"round",borderJoinStyle:"round",
+    return {label:sr.k,data,raw,borderColor:sr.color,backgroundColor:sr.color,borderWidth:many&&!sr.west?2:sr.w,pointRadius:many?(sr.west?5.5:3.5):(sr.west?7.5:5),pointHoverRadius:sr.west?10:8,pointBorderColor:"#fff",pointBorderWidth:sr.west?2:1.5,pointBackgroundColor:sr.color,borderCapStyle:"round",borderJoinStyle:"round",
             tension:0,spanGaps:false,$west:!!sr.west,$tc:sr.tc||sr.color,hidden:!!S.hidden[sr.k],order:sr.west?0:1};
   });
   // محور Y: يتكيّف مع القيم (مثل الباوربوينت 40–100)
@@ -436,13 +497,13 @@ function render(){
       interaction:{mode:"index",intersect:false},
       scales:{
         y:{min:lo,max:100,ticks:{stepSize:10,callback:v=>v+"%",color:"#52707e",font:{family:"Tajawal",size:13,weight:"600"}},grid:{color:"#e3edf3"},border:{display:false}},
-        x:{offset:true,ticks:{color:"#2c5468",font:{family:"Tajawal",size:NARROW?10.5:13,weight:"700"},maxRotation:NARROW?55:0,minRotation:NARROW?55:0,autoSkip:false},grid:{color:"#eef3f7"},border:{color:"#d6e2ea"}}
+        x:{offset:true,ticks:{color:"#2c5468",font:{family:"Tajawal",size:many?11:(NARROW?10.5:13),weight:"700"},maxRotation:(NARROW||many)?55:0,minRotation:(NARROW||many)?55:0,autoSkip:false},grid:{color:"#eef3f7"},border:{color:"#d6e2ea"}}
       },
       plugins:{
         legend:{display:false},
         tooltip:{rtl:true,textDirection:"rtl",titleFont:{family:"Tajawal",size:12.5,weight:"800"},bodyFont:{family:"Tajawal",size:12},
           callbacks:{
-            title:items=>"الأسبوع "+items[0].label,
+            title:items=>u.tip(list[items[0].dataIndex]),
             label:c=>{ if(c.raw==null) return c.dataset.label+": لا توجد بيانات"; const o=c.dataset.raw[c.dataIndex];
               const q=cnt(o,mode); return c.dataset.label+": "+c.raw.toFixed(1)+"%  ("+q.n.toLocaleString("en")+(mode==="new"?" بلاغ مُقيَّم، منها ":" بلاغ، منها ")+q.b.toLocaleString("en")+" مخترَق)"; }
           }}
@@ -450,46 +511,47 @@ function render(){
     },
     plugins:[labelPlugin]
   };
-  buildTable(list,mode); buildKpis(list,mode); buildLegend();   // نبني العناصر المحيطة أولًا عشان المقاسات تثبت قبل رسم الشارت
+  buildTable(list,mode,u); buildKpis(list,mode,u); buildLegend();   // نبني العناصر المحيطة أولًا عشان المقاسات تثبت قبل رسم الشارت
   if(chart){ chart.destroy(); }
   const showLabels = true && $('cv').parentElement.clientWidth>=700;
-  chart=new Chart($("cv"),cfg); chart.$labels=showLabels;
+  chart=new Chart($("cv"),cfg); chart.$labels=showLabels; chart.$onlyWest=many||(u.d&&list.length>8);
   // العنوان الفرعي
-  const a=list[0], b=addDays(list[list.length-1],6);
-  $("sub").textContent="الفترة: "+dmy(a)+(a.getFullYear()!==b.getFullYear()?" "+a.getFullYear():"")+" – "+dmy(b)+" "+b.getFullYear()+" · "+list.length+" "+(list.length===1?"أسبوع":"أسابيع")+" مكتملة";
+  const a=list[0], b=u.d?list[list.length-1]:addDays(list[list.length-1],6);
+  $("sub").textContent="الفترة: "+dmy(a)+(a.getFullYear()!==b.getFullYear()?" "+a.getFullYear():"")+" – "+dmy(b)+" "+b.getFullYear()+" · "+list.length+" "+(list.length===1?u.word:u.words)+" مكتملة"+(u.d?" (حتى أمس)":"");
   buildLegend();
-  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(S.n)));
+  syncControls();
   const SL=mode==="new"?"NEW SLA":"SLA";
   $("ttl").textContent="نسبة الالتزام بـ "+SL; $("cardTtl").textContent="نسبة الالتزام بـ "+SL; $("tbTitle").textContent="تقرير الالتزام بـ "+SL; document.title="تقرير الالتزام بـ "+SL+" – المنطقة الغربية";
   if(mode==="new" && !S.agg.hasNew) banner("لعرض NEW SLA لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة.");
   else if(S.notice) banner(S.notice);
-  else if(S.n>weeks.length) banner("المتاح "+weeks.length+" أسبوعًا مكتملًا فقط، وتم عرض كل المتاح.");
+  else if(fallback) banner(fallback);
+  else if(u.n>weeks.length) banner(u.d?("المتاح "+weeks.length+" يومًا مكتملًا فقط، وتم عرض كل المتاح."):("المتاح "+weeks.length+" أسبوعًا مكتملًا فقط، وتم عرض كل المتاح."));
   else banner("");
 }
-function buildKpis(list,mode){
+function buildKpis(list,mode,u){
   const lastW=list[list.length-1], prevW=list.length>1?list[list.length-2]:null;
-  const get=(sr,wk)=>{ if(!wk) return null; const w=S.agg.weeks[keyOf(wk)]; return pct(sr.west?sumWest(w):(w&&w[sr.k]),mode); };
+  const get=(sr,wk)=>{ if(!wk) return null; const w=u.map()[keyOf(wk)]; return pct(sr.west?sumWest(w):(w&&w[sr.k]),mode); };
   const order=[...CFG.SERIES.filter(x=>x.west),...CFG.SERIES.filter(x=>!x.west)];
   $("kpis").innerHTML=order.map(sr=>{
     const v=get(sr,lastW), pv=get(sr,prevW);
-    let d='<span class="kd na">لا يوجد أسبوع سابق للمقارنة</span>';
+    let d='<span class="kd na">'+u.noPrev+'</span>';
     if(v!=null&&pv!=null){ const x=v-pv, ax=Math.abs(x).toFixed(1);
-      d = Math.abs(x)<0.05 ? '<span class="kd eq">■ بدون تغيير عن الأسبوع السابق</span>'
-        : '<span class="kd '+(x>0?'up':'dn')+'">'+(x>0?'▲':'▼')+' '+ax+' نقطة عن الأسبوع السابق</span>'; }
+      d = Math.abs(x)<0.05 ? '<span class="kd eq">■ بدون تغيير عن '+u.prevTxt+'</span>'
+        : '<span class="kd '+(x>0?'up':'dn')+'">'+(x>0?'▲':'▼')+' '+ax+' نقطة عن '+u.prevTxt+'</span>'; }
     return '<div class="kpi'+(sr.west?' west':'')+'" style="--kc:'+sr.color+';--kt:'+(sr.tc||sr.color)+'">'
       +'<div class="kn"><i></i>'+sr.k+'</div>'
       +'<div class="kv">'+(v==null?'—':v.toFixed(1)+'%')+'</div>'
-      +d+'<div class="kw">آخر أسبوع مكتمل: <span dir="ltr" style="unicode-bidi:isolate">'+dm(lastW)+'–'+dm(addDays(lastW,6))+'</span></div></div>';
+      +d+'<div class="kw">'+u.lastTxt+': <span dir="ltr" style="unicode-bidi:isolate">'+u.range(lastW)+'</span></div></div>';
   }).join("");
 }
-function buildTable(list,mode){
-  const t=$("nums"); const hdr=list.map(s=>'<th>'+dm(s)+'–'+dm(addDays(s,6))+'</th>').join("");
+function buildTable(list,mode,u){
+  const t=$("nums"); const hdr=list.map(s=>'<th>'+u.cell(s)+'</th>').join("");
   let h='<tr><th class="rn">المنطقة</th>'+hdr+'</tr>';
   CFG.SERIES.forEach(sr=>{
     if(S.hidden[sr.k]) return;
     h+='<tr'+(sr.west?' class="west"':'')+'><td class="rn"><i style="background:'+sr.color+'"></i>'+sr.k+'</td>';
     list.forEach(s=>{
-      const w=S.agg.weeks[keyOf(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
+      const w=u.map()[keyOf(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
       h+= v==null? '<td class="na">—</td>' : '<td title="'+cnt(o,mode).n.toLocaleString("en")+(mode==="new"?' بلاغ مُقيَّم':' بلاغ')+'">'+v.toFixed(1)+'%</td>';
     });
     h+='</tr>';
@@ -507,6 +569,16 @@ function buildLegend(){
     e.onclick=()=>{ S.hidden[sr.k]=!S.hidden[sr.k]; render(); };
     lg.appendChild(e);
   });
+}
+function syncControls(){
+  const d=S.gran==="d";
+  $("chipsW").style.display=d?"none":"inline-flex"; $("chipsD").style.display=d?"inline-flex":"none";
+  $("flbl").textContent=d?"عدد الأيام:":"عدد الأسابيع:";
+  document.querySelectorAll("#gran button").forEach(b=>b.classList.toggle("on",b.dataset.g===S.gran));
+  const cur=d?S.nd:S.n;
+  document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(cur)));
+  $("granTxt").textContent=d?"يومياً":"أسبوعياً";
+  $("cardHint").textContent=d?"تاريخ اليوم: يوم/شهر":"تاريخ الأسبوع: يوم/شهر";
 }
 function banner(t){ const b=$("banner"); b.textContent=t; b.classList.toggle("show",!!t); }
 
@@ -537,11 +609,11 @@ const dataUrl=()=>CFG.BALAGH_URL+(CFG.BALAGH_URL.includes("?")?"&":"?")+"weeks="
 function toAgg(j){
   if(j && j.status==="building"){ const e=new Error("building"); e.building=true; throw e; }   // السيرفر بيجهّز النتيجة (أول مرة بعد النشر)
   if(!(j && j.status==="ok")) throw new Error("bad response");
-  if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.nagg, j.totalRows);
+  if(Array.isArray(j.agg)) return aggregateFromAgg(j.agg, j.nagg, j.totalRows, j.dagg, j.dnagg, {dfrom:j.dfrom,dto:j.dto});
   if(Array.isArray(j.data)) return aggregate(j.data);   // سيرفر قديم رجّع كل الصفوف
   throw new Error("bad response");
 }
-const sigOf=a=>JSON.stringify(a.weeks)+"|"+keyOf(weekWindow().cur)+"|"+keyOf(startOfToday());
+const sigOf=a=>JSON.stringify(a.weeks)+JSON.stringify(a.days||0)+"|"+keyOf(weekWindow().cur)+"|"+keyOf(startOfToday());
 /* نسخة محفوظة في المتصفح → الصفحة تظهر فورًا ثم تتحدّث (لو التخزين غير متاح بنكمل عادي) */
 function saveCache(){ try{ localStorage.setItem(CFG.CACHE_KEY,JSON.stringify({ts:Date.now(),agg:S.agg})); }catch(e){} }
 function loadCache(){
@@ -587,7 +659,8 @@ async function exportPng(){
 }
 
 /* ═════════════ الأحداث ═════════════ */
-document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{ S.n=+c.dataset.n; render(); });
+document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.onclick=()=>{ if(S.gran==="d") S.nd=+c.dataset.n; else S.n=+c.dataset.n; if(S.agg) render(); else syncControls(); });
+document.querySelectorAll("#gran button").forEach(b=>b.onclick=()=>{ S.gran=b.dataset.g; if(S.agg) render(); else syncControls(); });
 $("btnTbl").onclick=()=>{ const cur=S.tbl==null?window.innerWidth<700:S.tbl; S.tbl=!cur; if(S.agg) render(); };
 $("mode").onchange=e=>{ S.mode=e.target.value; render(); };
 $("btnReload").onclick=()=>load(false);
