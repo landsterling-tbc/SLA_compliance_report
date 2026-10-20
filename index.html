@@ -119,6 +119,16 @@ table.nums td.rn i{display:inline-block;width:11px;height:11px;border-radius:50%
 table.nums tr.west td{background:#fbeceb;font-weight:900;font-size:15px;color:#9d2a1e}
 table.nums tr.west td.rn{background:#fbeceb}
 table.nums td.na{color:#9aaab4;font-weight:500}
+.kpinote{display:none;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--tx-sec);align-items:center;gap:8px;flex-wrap:wrap}
+.kpinote.show{display:flex}
+.kpinote b{color:var(--navy)}
+.kpinote .live{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;background:#e3f4ee;color:#066a52;font-size:11.5px}
+.kpinote .live::before{content:"";width:7px;height:7px;border-radius:50%;background:#2fbf8f;animation:pulse 1.4s infinite}
+.hsel{font-family:Tajawal;font-size:12.5px;font-weight:700;color:var(--navy);border:1.5px solid var(--bd);border-radius:999px;padding:4px 12px;background:var(--bg-2);cursor:pointer}
+.kpi .hc{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:11px;font-weight:700;color:var(--tx-sec);font-variant-numeric:tabular-nums}
+.kpi .hc span b{color:var(--kt);font-weight:900}
+.kpi svg.hb{display:block;width:100%;height:38px;margin-top:6px}
+.kpi .hx{display:flex;justify-content:space-between;direction:ltr;font-size:9.5px;color:var(--tx-muted);font-weight:600;margin-top:1px}
 .foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--tx-muted)}
 .foot select{font-family:Tajawal;font-size:12px;font-weight:600;color:var(--navy);border:1.5px solid var(--bd);border-radius:8px;padding:3px 8px;background:var(--bg-2)}
 .foot b{color:var(--tx-sec)}
@@ -136,6 +146,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
 .banner{display:none;margin-top:10px;padding:8px 14px;border-radius:10px;font-size:12.5px;font-weight:600;background:#fdf6ec;color:#92590a;border:1px solid #f0d9b4}
 .banner.show{display:block}
 @media(max-width:820px){
+  .kpi .hc{font-size:10.5px}
   .page{padding:12px}.stage{padding:16px;min-height:0;overflow:visible}.hd h1{font-size:19px}
   .tb-title,.tb-divider:last-of-type,.tb-right span{display:none}
   .tb-brand{padding:0 12px;gap:10px}.tb-brand img{height:auto!important;max-height:22px;max-width:80px}
@@ -174,7 +185,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
         <div class="sub" id="sub">—</div>
       </div>
       <div class="filters" id="filters" data-html2canvas-ignore="true">
-        <div class="seg" id="gran"><button type="button" data-g="w" class="on">أسبوعي</button><button type="button" data-g="d">يومي</button></div>
+        <div class="seg" id="gran"><button type="button" data-g="w" class="on">أسبوعي</button><button type="button" data-g="d">يومي</button><button type="button" data-g="h">بالساعة</button></div>
         <span class="lbl" id="flbl">عدد الأسابيع:</span>
         <span id="chipsW" style="display:inline-flex;gap:6px;flex-wrap:wrap">
           <button class="chip" data-n="4">آخر 4</button>
@@ -188,11 +199,14 @@ table.nums td.na{color:#9aaab4;font-weight:500}
           <button class="chip" data-n="21">آخر 21 يومًا</button>
           <button class="chip" data-n="30">آخر 30 يومًا</button>
         </span>
+        <span id="hdayWrap" style="display:none;align-items:center;gap:6px"><span class="lbl">الكروت ليوم:</span><select id="hday" class="hsel"></select></span>
+        <div class="seg" id="hmode" style="display:none;margin:0"><button type="button" data-m="c" class="on">تراكمي</button><button type="button" data-m="s">كل ساعة</button></div>
       </div>
     </div>
 
     <div class="banner" id="banner"></div>
 
+    <div class="kpinote" id="kpiNote"></div>
     <div class="kpis" id="kpis"></div>
 
     <div class="card">
@@ -362,7 +376,7 @@ function pct(o,mode){
 
 /* ═════════════ الحالة العامة ═════════════ */
 const cnt=(o,mode)=> mode==="new" ? {n:(o.nc||0)+(o.nb||0)+(o.nbo||0), b:(o.nb||0)+(o.nbo||0)} : {n:o.n,b:o.b};
-const S={agg:null, sig:"", n:8, nd:14, gran:"w", mode:"new", hidden:{}, notice:"", tbl:null};
+const S={agg:null, sig:"", n:8, nd:14, gran:"w", mode:"new", hidden:{}, notice:"", tbl:null, hours:null, hcum:true, hday:"", hLoading:false, hFail:"", ctx:null};
 let chart=null;
 
 function completeWeeks(){
@@ -387,15 +401,21 @@ function completeDays(){
 }
 /* وحدة العرض: أسبوع (السبت→الجمعة) أو يوم — كل دوال الرسم والجدول والكروت تستخدمها */
 function U(){
+  if(S.gran==="h" && S.hours){
+    const b=hrBuild(), nowIdx=b.slots.filter(x=>!x.future).length;
+    return {d:false,h:true, all:b.slots, n:24, map:()=>b.map, key:s=>s.k,
+      lab:s=>String(s.h).padStart(2,"0")+":00", tip:s=>DOW[fromKey(s.day).getDay()]+" "+dm(fromKey(s.day))+" — الساعة "+String(s.h).padStart(2,"0")+":00",
+      cell:s=>String(s.h).padStart(2,"0")+":00", prevTxt:"", lastTxt:"", noPrev:"", range:s=>String(s.h).padStart(2,"0")+":00", word:"ساعة", words:"ساعة"};
+  }
   if(S.gran==="d"){
     const n=Math.min(S.nd,CFG.MAX_DAYS);
-    return {d:true, all:completeDays(), n, map:()=>S.agg.days,
+    return {d:true,key:keyOf, all:completeDays(), n, map:()=>S.agg.days,
       lab:(d,len)=>len<=14?[DOW[d.getDay()],dm(d)]:dm(d), tip:d=>DOW[d.getDay()]+" "+dm(d)+"/"+d.getFullYear(),
       cell:d=>DOW[d.getDay()]+" "+dm(d), titlePrefix:"", prevTxt:"اليوم السابق", lastTxt:"آخر يوم مكتمل", noPrev:"لا يوجد يوم سابق للمقارنة",
       range:d=>DOW[d.getDay()]+" "+dm(d), word:"يوم", words:"أيام"};
   }
   const n=Math.min(S.n,CFG.MAX_WEEKS);
-  return {d:false, all:completeWeeks(), n, map:()=>S.agg.weeks,
+  return {d:false, key:keyOf, all:completeWeeks(), n, map:()=>S.agg.weeks,
     lab:(s)=>dm(s)+"–"+dm(addDays(s,6)), tip:s=>"الأسبوع "+dm(s)+"–"+dm(addDays(s,6)),
     cell:s=>dm(s)+"–"+dm(addDays(s,6)), prevTxt:"الأسبوع السابق", lastTxt:"آخر أسبوع مكتمل", noPrev:"لا يوجد أسبوع سابق للمقارنة",
     range:s=>dm(s)+"–"+dm(addDays(s,6)), word:"أسبوع", words:"أسابيع"};
@@ -466,19 +486,23 @@ const labelPlugin={
 function render(){
   const NARROW=window.innerWidth<700;
   let fallback="";
+  if(S.gran==="h"){
+    if(!S.hours && !S.hFail){ if(!S.hLoading) loadHours(false); showMsg("جاري تحميل بيانات الساعة…","",false); return; }
+    if(S.hFail || !S.hours.hasTime){ fallback = S.hFail ? "عرض الساعة يحتاج نشر إضافة balagh_hours.gs في سكريبت البلاغات." : "تاريخ الإنشاء في الشيت بدون وقت، فلا يمكن العرض بالساعة."; S.gran="w"; }
+  }
   if(S.gran==="d" && !(S.agg&&S.agg.hasDaily)){ S.gran="w"; fallback="لعرض اليومي لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة."; }
   const u=U();
   const weeks=u.all;
   const mode=S.mode;
-  if(!weeks.length){ showMsg(u.d?"لا توجد أيام مكتملة":"لا توجد أسابيع مكتملة", u.d?"لا توجد بلاغات كافية لعرض يوم مكتمل واحد على الأقل.":"لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
+  if(!u.h && !weeks.length){ showMsg(u.d?"لا توجد أيام مكتملة":"لا توجد أسابيع مكتملة", u.d?"لا توجد بلاغات كافية لعرض يوم مكتمل واحد على الأقل.":"لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
   hideOverlay();
-  let list=weeks.slice(-u.n);
+  let list=u.h?weeks:weeks.slice(-u.n);
   const labels=list.map(s=>u.lab(s,list.length));
   const many=u.d && list.length>14;
   const ds=CFG.SERIES.map(sr=>{
     const data=[], raw=[];
     list.forEach(s=>{
-      const w=u.map()[keyOf(s)];
+      const w=u.map()[u.key(s)];
       const o=sr.west?sumWest(w):(w&&w[sr.k]);
       raw.push(o||mkO());
       data.push(pct(o,mode));
@@ -511,12 +535,15 @@ function render(){
     },
     plugins:[labelPlugin]
   };
+  S.ctx={list,mode,u};
+  if(u.d && !S.hours && !S.hLoading && !S.hFail) loadHours(false);
   buildTable(list,mode,u); buildKpis(list,mode,u); buildLegend();   // نبني العناصر المحيطة أولًا عشان المقاسات تثبت قبل رسم الشارت
   if(chart){ chart.destroy(); }
   const showLabels = true && $('cv').parentElement.clientWidth>=700;
-  chart=new Chart($("cv"),cfg); chart.$labels=showLabels; chart.$onlyWest=many||(u.d&&list.length>8);
+  chart=new Chart($("cv"),cfg); chart.$labels=showLabels; chart.$onlyWest=many||(u.d&&list.length>8)||!!u.h;
   // العنوان الفرعي
-  const a=list[0], b=u.d?list[list.length-1]:addDays(list[list.length-1],6);
+  const a=u.h?null:list[0], b=u.h?null:(u.d?list[list.length-1]:addDays(list[list.length-1],6));
+  if(u.h){ const act=list.filter(x=>!x.future), f=act[0], l=act[act.length-1]; $("sub").textContent=(S.hday==="24h"?"آخر 24 ساعة":DOW[fromKey(f.day).getDay()]+" "+dm(fromKey(f.day)))+" · من "+String(f.h).padStart(2,"0")+":00 حتى "+((S.hday==="24h"||!S.hday||S.hday===S.hours.today)?S.hours.nowTxt:"23:59")+" · "+(S.hcum?"النسبة تراكمية من بداية الفترة":"نسبة كل ساعة على حدة")+" · آخر حساب "+S.hours.nowTxt; } else
   $("sub").textContent="الفترة: "+dmy(a)+(a.getFullYear()!==b.getFullYear()?" "+a.getFullYear():"")+" – "+dmy(b)+" "+b.getFullYear()+" · "+list.length+" "+(list.length===1?u.word:u.words)+" مكتملة"+(u.d?" (حتى أمس)":"");
   buildLegend();
   syncControls();
@@ -529,8 +556,10 @@ function render(){
   else banner("");
 }
 function buildKpis(list,mode,u){
+  if((u.d||u.h) && S.hours){ buildHourKpis(mode,u.h); return; }
+  $("kpiNote").classList.remove("show");
   const lastW=list[list.length-1], prevW=list.length>1?list[list.length-2]:null;
-  const get=(sr,wk)=>{ if(!wk) return null; const w=u.map()[keyOf(wk)]; return pct(sr.west?sumWest(w):(w&&w[sr.k]),mode); };
+  const get=(sr,wk)=>{ if(!wk) return null; const w=u.map()[u.key(wk)]; return pct(sr.west?sumWest(w):(w&&w[sr.k]),mode); };
   const order=[...CFG.SERIES.filter(x=>x.west),...CFG.SERIES.filter(x=>!x.west)];
   $("kpis").innerHTML=order.map(sr=>{
     const v=get(sr,lastW), pv=get(sr,prevW);
@@ -544,6 +573,101 @@ function buildKpis(list,mode,u){
       +d+'<div class="kw">'+u.lastTxt+': <span dir="ltr" style="unicode-bidi:isolate">'+u.range(lastW)+'</span></div></div>';
   }).join("");
 }
+
+/* ═════════════ الكروت بالساعة (تظهر لما نختار "يومي") ═════════════
+   مصدرها: ?weeks=hours  (balagh_hours.gs) → hagg/hnagg = [اليوم، الساعة، المحافظة، الحالة، العدد]
+   الرسم البياني يفضل بالأيام المكتملة كما هو. */
+function parseHours(j){
+  const by={}; const days={};
+  const put=(arr,fn)=>{ for(const g of arr){ const day=String(g[0]), h=+g[1], region=CFG.SECTOR_TO_REGION[norm(g[2])]; const c=+g[4]||0; if(!region||!c) continue;
+    const d=by[day]||(by[day]={}); const hh=d[h]||(d[h]={}); const o=hh[region]||(hh[region]=mkO()); fn(o,norm(g[3]),c); days[day]=1; } };
+  put(j.hagg||[],(o,st,c)=>{ o.n+=c; if(st===CFG.BREACH)o.b+=c; else if(st===CFG.PASS)o.p+=c; });
+  put(j.hnagg||[],(o,st,c)=>{ if(st==="compliant")o.nc+=c; else if(st==="breach")o.nb+=c; else if(st==="breach_open")o.nbo+=c; else if(st==="pending")o.np+=c; });
+  const nowH = j.now && /\d{2}:\d{2}$/.test(j.now) ? +j.now.slice(-5,-3) : 23;
+  return {by, today:String(j.today), nowH, nowTxt:(j.now||"").slice(-5), hasTime:!!j.hasTime, ts:j.timestamp?new Date(j.timestamp).getTime():Date.now(), days:Object.keys(days).concat([String(j.today)]).filter((v,i,a)=>a.indexOf(v)===i).sort().reverse()};
+}
+async function loadHours(silent){
+  if(S.hLoading) return; S.hLoading=true;
+  try{
+    const j=await fetchOnce(CFG.BALAGH_URL+"?weeks=hours",40000);
+    if(j&&j.status==="building"){ S.hLoading=false; setTimeout(()=>loadHours(silent),4000); return; }
+    if(!(j&&j.status==="ok"&&j.hours&&Array.isArray(j.hagg))) throw new Error("hours-unsupported");
+    S.hours=parseHours(j); S.hFail="";
+    if(!S.hday||S.hours.days.indexOf(S.hday)<0) S.hday="";
+    fillHday(); syncControls();
+    if(S.gran==="h") render(); else if(S.gran==="d" && S.ctx) buildKpis(S.ctx.list,S.ctx.mode,S.ctx.u);
+  }catch(e){
+    console.warn("[SLA] hours failed",e);
+    if(!S.hours && !silent){ S.hFail=String(e&&e.message||e); if(S.gran==="h"){ render(); } else if(S.gran==="d") banner(e&&e.message==="hours-unsupported"?"عرض الساعة يحتاج نشر إضافة balagh_hours.gs في سكريبت البلاغات (الكروت معروضة بالأيام حاليًا).":ERR_TXT); }
+  }finally{ S.hLoading=false; }
+}
+function fillHday(){
+  const sel=$("hday"); if(!S.hours) return; const t=S.hours.today;
+  sel.innerHTML=S.hours.days.map(k=>{ const d=fromKey(k); const l=(k===t?"اليوم – ":"")+DOW[d.getDay()]+" "+dm(d); return '<option value="'+(k===t?"":k)+'">'+l+'</option>'; }).join("")+'<option value="24h">آخر 24 ساعة</option>';
+  sel.value=S.hday;
+}
+
+/* شرائح الساعات: اليوم المختار (00..23) أو آخر 24 ساعة. future = ساعة لسه ما جتش */
+function hrSlots(sel){
+  const H=S.hours, today=H.today, nowH=H.nowH;
+  const mk=(day,h,fut)=>({k:day+"|"+h,day:day,h:h,future:!!fut});
+  if(sel==="24h"){ let d=fromKey(today), h=nowH; const t=[];
+    for(let i=0;i<24;i++){ t.push(mk(keyOf(d),h,false)); h--; if(h<0){ h=23; d=addDays(d,-1); } }
+    return t.reverse(); }
+  const day=sel||today, t=[];
+  for(let h=0;h<24;h++) t.push(mk(day,h,day===today&&h>nowH));
+  return t;
+}
+function slotO(sl,region){ const d=S.hours.by[sl.day]; return (d&&d[sl.h]&&d[sl.h][region])||null; }
+function addInto(t,o){ if(o) for(const k in t) t[k]+=(o[k]||0); }
+function slotsSum(slots,regionKey){ const t=mkO(); const regs=regionKey===WEST?REGIONS:[regionKey];
+  slots.forEach(sl=>{ if(sl.future) return; regs.forEach(r=>addInto(t,slotO(sl,r))); }); return t; }
+function hrBuild(){
+  const slots=hrSlots(S.hday), map={}, run={}; REGIONS.forEach(r=>run[r]=mkO());
+  slots.forEach(sl=>{ const e={}; if(!sl.future) REGIONS.forEach(r=>{ if(S.hcum){ addInto(run[r],slotO(sl,r)); e[r]=Object.assign({},run[r]); } else { const c=mkO(); addInto(c,slotO(sl,r)); e[r]=c; } }); map[sl.k]=e; });
+  return {slots,map};
+}
+function hourBars(slots,regionKey,mode,color){
+  const regs=regionKey===WEST?REGIONS:[regionKey], tot=[],br=[]; let mx=1;
+  slots.forEach(sl=>{ let n=0,b=0; if(!sl.future) regs.forEach(r=>{ const o=slotO(sl,r); if(!o) return;
+      if(mode==="new"){ n+=(o.nc||0)+(o.nb||0)+(o.nbo||0)+(o.np||0); b+=(o.nb||0)+(o.nbo||0); } else { n+=o.n; b+=o.b; } });
+    tot.push(n); br.push(b); if(n>mx) mx=n; });
+  const lastIdx=slots.map(x=>x.future).lastIndexOf(false), bw=100/24; let g="";
+  slots.forEach((sl,i)=>{ const x=(i*bw+bw*0.15).toFixed(2), w=(bw*0.7).toFixed(2), lab=String(sl.h).padStart(2,"0")+":00";
+    if(sl.future){ g+='<rect x="'+x+'" y="36" width="'+w+'" height="2" rx="1" fill="#dbe6ed"/>'; return; }
+    const th=Math.max(tot[i]/mx*34,tot[i]?2:0), bh=br[i]/mx*34;
+    g+='<rect x="'+x+'" y="'+(36-th).toFixed(1)+'" width="'+w+'" height="'+th.toFixed(1)+'" rx="1.2" fill="'+color+'" opacity="'+(i===lastIdx?1:.62)+'"><title>'+lab+' — '+tot[i]+' بلاغ'+(br[i]?'، منها '+br[i]+' مخترَق':'')+'</title></rect>';
+    if(br[i]) g+='<rect x="'+x+'" y="'+(36-bh).toFixed(1)+'" width="'+w+'" height="'+bh.toFixed(1)+'" rx="1.2" fill="#c0392b"/>'; });
+  const L=i=>String(slots[i].h).padStart(2,"0");
+  return '<svg class="hb" viewBox="0 0 100 38" preserveAspectRatio="none">'+g+'</svg><div class="hx"><span>'+L(0)+'</span><span>'+L(6)+'</span><span>'+L(12)+'</span><span>'+L(18)+'</span><span>'+L(23)+'</span></div>';
+}
+function buildHourKpis(mode,hourly){
+  const H=S.hours, sel=(!hourly&&S.hday==="24h")?"":S.hday, slots=hrSlots(sel);
+  const act=slots.filter(x=>!x.future), f=act[0], l=act[act.length-1];
+  const prev=slots.map(sl=>({k:"",day:keyOf(addDays(fromKey(sl.day),-1)),h:sl.h,future:sl.future}));
+  const isLive=sel==="24h"||!sel||sel===H.today;
+  const order=[...CFG.SERIES.filter(x=>x.west),...CFG.SERIES.filter(x=>!x.west)];
+  const q=o=> mode==="new" ? {n:(o.nc||0)+(o.nb||0)+(o.nbo||0), b:(o.nb||0)+(o.nbo||0), all:(o.nc||0)+(o.nb||0)+(o.nbo||0)+(o.np||0), pend:o.np||0} : {n:o.n, b:o.b, all:o.n, pend:Math.max(0,o.n-o.b)};
+  const dd=fromKey(f.day), hh=x=>String(x).padStart(2,"0");
+  const what = sel==="24h" ? "<b>آخر 24 ساعة</b> ("+hh(f.h)+":00 ← "+hh(l.h)+":59)" : "<b>"+(isLive?"اليوم ":"")+DOW[dd.getDay()]+" "+dm(dd)+"</b> من 00:00 حتى <b>"+(isLive?H.nowTxt:"23:59")+"</b>";
+  const note=$("kpiNote");
+  note.innerHTML=(isLive?'<span class="live">مباشر</span> ':'')+'الكروت: '+what+' — المقارنة بنفس الفترة قبلها بـ 24 ساعة'+(hourly?'':' · الرسم: أيام مكتملة')+(H.hasTime?'':' <span style="color:#92590a">⚠ تاريخ الإنشاء بدون وقت — لا يمكن التقسيم بالساعة.</span>');
+  note.classList.add("show");
+  $("kpis").innerHTML=order.map(sr=>{
+    const o=slotsSum(slots,sr.k), po=slotsSum(prev,sr.k);
+    const v=pct(o,mode), pv=pct(po,mode), c=q(o);
+    let d='<span class="kd na">لا توجد مقارنة</span>';
+    if(v!=null&&pv!=null){ const x=v-pv, ax=Math.abs(x).toFixed(1), w='أمس (نفس الفترة)';
+      d = Math.abs(x)<0.05 ? '<span class="kd eq">■ بدون تغيير عن '+w+'</span>' : '<span class="kd '+(x>0?'up':'dn')+'">'+(x>0?'▲':'▼')+' '+ax+' نقطة عن '+w+'</span>'; }
+    let curH=0; if(isLive){ const regs=sr.west?REGIONS:[sr.k]; regs.forEach(r=>{ const x=slotO(l,r); if(x) curH+= mode==="new" ? (x.nc||0)+(x.nb||0)+(x.nbo||0)+(x.np||0) : x.n; }); }
+    return '<div class="kpi'+(sr.west?' west':'')+'" style="--kc:'+sr.color+';--kt:'+(sr.tc||sr.color)+'">'
+      +'<div class="kn"><i></i>'+sr.k+'</div>'
+      +'<div class="kv">'+(v==null?'—':v.toFixed(1)+'%')+'</div>'+d
+      +'<div class="hc"><span>إجمالي: <b>'+c.all+'</b></span><span>مُقيَّم: <b>'+c.n+'</b></span><span>مخترَق: <b>'+c.b+'</b></span><span>قيد التنفيذ: <b>'+c.pend+'</b></span>'+(isLive?'<span>الساعة الحالية: <b>+'+curH+'</b></span>':'')+'</div>'
+      +hourBars(slots,sr.k,mode,sr.color)+'</div>';
+  }).join("");
+}
+
 function buildTable(list,mode,u){
   const t=$("nums"); const hdr=list.map(s=>'<th>'+u.cell(s)+'</th>').join("");
   let h='<tr><th class="rn">المنطقة</th>'+hdr+'</tr>';
@@ -551,7 +675,7 @@ function buildTable(list,mode,u){
     if(S.hidden[sr.k]) return;
     h+='<tr'+(sr.west?' class="west"':'')+'><td class="rn"><i style="background:'+sr.color+'"></i>'+sr.k+'</td>';
     list.forEach(s=>{
-      const w=u.map()[keyOf(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
+      const w=u.map()[u.key(s)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); const v=pct(o,mode);
       h+= v==null? '<td class="na">—</td>' : '<td title="'+cnt(o,mode).n.toLocaleString("en")+(mode==="new"?' بلاغ مُقيَّم':' بلاغ')+'">'+v.toFixed(1)+'%</td>';
     });
     h+='</tr>';
@@ -572,13 +696,18 @@ function buildLegend(){
 }
 function syncControls(){
   const d=S.gran==="d";
-  $("chipsW").style.display=d?"none":"inline-flex"; $("chipsD").style.display=d?"inline-flex":"none";
+  const hh=S.gran==="h";
+  $("chipsW").style.display=(d||hh)?"none":"inline-flex"; $("chipsD").style.display=d?"inline-flex":"none";
+  $("flbl").style.display=hh?"none":"";
   $("flbl").textContent=d?"عدد الأيام:":"عدد الأسابيع:";
+  $("hmode").style.display=hh?"inline-flex":"none";
+  document.querySelectorAll("#hmode button").forEach(b=>b.classList.toggle("on",(b.dataset.m==="c")===S.hcum));
   document.querySelectorAll("#gran button").forEach(b=>b.classList.toggle("on",b.dataset.g===S.gran));
   const cur=d?S.nd:S.n;
   document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(cur)));
-  $("granTxt").textContent=d?"يومياً":"أسبوعياً";
-  $("cardHint").textContent=d?"تاريخ اليوم: يوم/شهر":"تاريخ الأسبوع: يوم/شهر";
+  $("granTxt").textContent=hh?"بالساعة":(d?"يومياً":"أسبوعياً");
+  $("hdayWrap").style.display=((d||hh)&&S.hours)?"inline-flex":"none";
+  $("cardHint").textContent=hh?"الساعة":(d?"تاريخ اليوم: يوم/شهر":"تاريخ الأسبوع: يوم/شهر");
 }
 function banner(t){ const b=$("banner"); b.textContent=t; b.classList.toggle("show",!!t); }
 
@@ -661,6 +790,8 @@ async function exportPng(){
 /* ═════════════ الأحداث ═════════════ */
 document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.onclick=()=>{ if(S.gran==="d") S.nd=+c.dataset.n; else S.n=+c.dataset.n; if(S.agg) render(); else syncControls(); });
 document.querySelectorAll("#gran button").forEach(b=>b.onclick=()=>{ S.gran=b.dataset.g; if(S.agg) render(); else syncControls(); });
+$("hday").onchange=e=>{ S.hday=e.target.value; if(S.gran==="h") render(); else if(S.ctx&&S.hours) buildKpis(S.ctx.list,S.ctx.mode,S.ctx.u); };
+document.querySelectorAll("#hmode button").forEach(b=>b.onclick=()=>{ S.hcum=b.dataset.m==="c"; if(S.gran==="h") render(); });
 $("btnTbl").onclick=()=>{ const cur=S.tbl==null?window.innerWidth<700:S.tbl; S.tbl=!cur; if(S.agg) render(); };
 $("mode").onchange=e=>{ S.mode=e.target.value; render(); };
 $("btnReload").onclick=()=>load(false);
@@ -675,7 +806,8 @@ window.__SLA__={S,aggregate,pct,completeWeeks,render}; // للتجربة
   if(c){ S.agg=c.agg; S.sig=sigOf(c.agg); stamp(c.ts); try{ render(); }catch(e){ S.agg=null; } }   // عرض فوري من آخر نسخة
   if(S.agg) setDot("loading");
   load(!!S.agg,true);
-  setInterval(()=>{ if(!document.hidden) load(true); }, CFG.POLL_SEC*1000);
+  setTimeout(()=>loadHours(true),1200);   // تحميل مسبق لبيانات الساعة عشان تفتح فورًا
+  setInterval(()=>{ if(!document.hidden){ load(true); if(S.gran==="d"||S.gran==="h") loadHours(true); } }, CFG.POLL_SEC*1000);
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Date.now()-lastCheck>20000) load(true); });
   window.addEventListener("online",()=>load(true));
 })();
