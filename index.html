@@ -16,6 +16,13 @@
   window.__EARLY={u:u,p:fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
 }catch(e){} })();
 </script>
+<script>
+/* ⚡ بيانات الساعة كمان تتطلب بدري بالتوازي */
+(function(){ try{
+  var u="https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec?weeks=hours";
+  window.__EARLYH={u:u,p:fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+}catch(e){} })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 /* ── ألوان الداشبورد (نفس رموز dashboard.css) ── */
@@ -129,6 +136,17 @@ table.nums td.na{color:#9aaab4;font-weight:500}
 .kpi .hc span b{color:var(--kt);font-weight:900}
 .kpi svg.hb{display:block;width:100%;height:38px;margin-top:6px}
 .kpi .hx{display:flex;justify-content:space-between;direction:ltr;font-size:9.5px;color:var(--tx-muted);font-weight:600;margin-top:1px}
+.how{margin-top:10px;border:1px solid var(--bd);border-radius:12px;background:var(--bg-2);padding:0 16px}
+.how summary{cursor:pointer;font-family:Tajawal;font-weight:800;font-size:13.5px;color:var(--navy);padding:10px 0;list-style:none}
+.how summary::before{content:"＋";margin-left:8px;color:var(--teal-3)}
+.how[open] summary::before{content:"－"}
+.how .bd{padding:2px 0 14px;font-size:13px;line-height:1.95;color:var(--tx-main)}
+.how .bd b{color:var(--navy)}
+.how .eq{display:inline-block;direction:rtl;background:#fff;border:1px solid var(--bd);border-radius:8px;padding:6px 14px;font-weight:800;color:var(--navy);margin:4px 0}
+.how table{border-collapse:collapse;margin:6px 0;font-size:12.5px}
+.how th,.how td{border:1px solid var(--bd);padding:4px 14px;text-align:center;background:#fff}
+.how th{background:#eef3f7;color:var(--tx-sec)}
+.how ul{margin:4px 18px 4px 0;padding:0}
 .foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--tx-muted)}
 .foot select{font-family:Tajawal;font-size:12px;font-weight:600;color:var(--navy);border:1.5px solid var(--bd);border-radius:8px;padding:3px 8px;background:var(--bg-2)}
 .foot b{color:var(--tx-sec)}
@@ -218,14 +236,26 @@ table.nums td.na{color:#9aaab4;font-weight:500}
     <div class="tblwrap" id="tblwrap"><table class="nums" id="nums"></table></div>
 
     <div class="foot">
-      <div data-html2canvas-ignore="true" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="chip" id="btnTbl" type="button">عرض جدول الأرقام</button><span>طريقة الحساب:</span>
-        <select id="mode">
-          <option value="new" selected>NEW SLA (كما في تبويب NEW SLA): «ملتزم» ÷ («ملتزم» + «اختراق») للبلاغات المصنّفة P1–P4</option>
-          <option value="tab">كما في تبويب البلاغات: (الكل − «تم اختراقه») ÷ الكل</option>
-          <option value="eval">المُقيَّم فقط: «ضمن SLA» ÷ («ضمن SLA» + «تم اختراقه»)</option>
-        </select>
+      <div data-html2canvas-ignore="true" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="chip" id="btnTbl" type="button">عرض جدول الأرقام</button><span>طريقة الحساب: <b>NEW SLA</b> فقط — التفاصيل في الصندوق أدناه</span>
       </div>
     </div>
+
+    <details class="how" data-html2canvas-ignore="true">
+      <summary>كيف تُحسب النسبة؟</summary>
+      <div class="bd">
+        <div class="eq">النسبة = ملتزم ÷ ( ملتزم + اختراق + اختراق قائم )</div>
+        <ul>
+          <li><b>الأولوية والمدة المسموحة:</b> تُحدَّد من «الفئة الفرعية» للبلاغ حسب جدول NEW SLA:
+            <table><tr><th>الأولوية</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th></tr><tr><th>المدة</th><td>ساعتان</td><td>4 ساعات</td><td>24 ساعة</td><td>48 ساعة</td><td>مستبعد</td></tr></table></li>
+          <li><b>بلاغ مغلق:</b> إذا كانت مدة الحل (من الإنشاء إلى الإغلاق) ضمن المدة المسموحة فهو <b>ملتزم</b>، وإلا فهو <b>اختراق</b>.</li>
+          <li><b>بلاغ مفتوح:</b> إذا تجاوز الوقت منذ إنشائه المدة المسموحة فهو <b>اختراق قائم</b>، وإلا فهو <b>قيد التنفيذ</b> ولا يدخل في النسبة بعد.</li>
+          <li><b>لا يدخل في الحساب:</b> بلاغات P5، والبلاغات التي لا تطابق فئتها الفرعية أي صف في الجدول، والمغلقة بلا تاريخ حل.</li>
+          <li><b>المنطقة الغربية:</b> مجموع بلاغات المناطق الأربع (جدة، مكة المكرمة، المدينة المنورة، الطائف) ثم تُحسب النسبة، وليست متوسط النسب.</li>
+          <li><b>الأسبوعي:</b> أسابيع مكتملة من السبت إلى الجمعة، بحسب تاريخ إنشاء البلاغ. <b>اليومي:</b> أيام مكتملة حتى أمس.</li>
+          <li><b>بالساعة:</b> بلاغات اليوم المختار (أو آخر 24 ساعة) موزعة على ساعة الإنشاء. «تراكمي» = النسبة من بداية الفترة حتى تلك الساعة، و«كل ساعة» = بلاغات تلك الساعة وحدها. اليوم الحالي غير مكتمل فتتغير نسبته مع إغلاق البلاغات وتجاوز المدد.</li>
+        </ul>
+      </div>
+    </details>
 
     <div class="overlay show" id="overlay">
       <div class="spin" id="spin"></div>
@@ -517,10 +547,10 @@ function render(){
     type:"line",data:{labels,datasets:ds},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:350},
-      layout:{padding:{top:30,right:40,left:4,bottom:8}},
+      layout:{padding:{top:18,right:40,left:4,bottom:8}},
       interaction:{mode:"index",intersect:false},
       scales:{
-        y:{min:lo,max:100,ticks:{stepSize:10,callback:v=>v+"%",color:"#52707e",font:{family:"Tajawal",size:13,weight:"600"}},grid:{color:"#e3edf3"},border:{display:false}},
+        y:{min:lo,max:106,ticks:{stepSize:10,includeBounds:false,callback:v=>v<=100?v+"%":"",color:"#52707e",font:{family:"Tajawal",size:13,weight:"600"}},grid:{color:"#e3edf3"},border:{display:false}},
         x:{offset:true,ticks:{color:"#2c5468",font:{family:"Tajawal",size:many?11:(NARROW?10.5:13),weight:"700"},maxRotation:(NARROW||many)?55:0,minRotation:(NARROW||many)?55:0,autoSkip:false},grid:{color:"#eef3f7"},border:{color:"#d6e2ea"}}
       },
       plugins:{
@@ -589,10 +619,13 @@ function parseHours(j){
 async function loadHours(silent){
   if(S.hLoading) return; S.hLoading=true;
   try{
-    const j=await fetchOnce(CFG.BALAGH_URL+"?weeks=hours",40000);
+    let j=null;
+    if(window.__EARLYH){ j=await window.__EARLYH.p; window.__EARLYH=null; }
+    if(!j) j=await fetchOnce(CFG.BALAGH_URL+"?weeks=hours",40000);
     if(j&&j.status==="building"){ S.hLoading=false; setTimeout(()=>loadHours(silent),4000); return; }
     if(!(j&&j.status==="ok"&&j.hours&&Array.isArray(j.hagg))) throw new Error("hours-unsupported");
     S.hours=parseHours(j); S.hFail="";
+    try{ localStorage.setItem("sla_hours_cache_v1",JSON.stringify({ts:Date.now(),j:j})); }catch(e){}
     if(!S.hday||S.hours.days.indexOf(S.hday)<0) S.hday="";
     fillHday(); syncControls();
     if(S.gran==="h") render(); else if(S.gran==="d" && S.ctx) buildKpis(S.ctx.list,S.ctx.mode,S.ctx.u);
@@ -793,7 +826,6 @@ document.querySelectorAll("#gran button").forEach(b=>b.onclick=()=>{ S.gran=b.da
 $("hday").onchange=e=>{ S.hday=e.target.value; if(S.gran==="h") render(); else if(S.ctx&&S.hours) buildKpis(S.ctx.list,S.ctx.mode,S.ctx.u); };
 document.querySelectorAll("#hmode button").forEach(b=>b.onclick=()=>{ S.hcum=b.dataset.m==="c"; if(S.gran==="h") render(); });
 $("btnTbl").onclick=()=>{ const cur=S.tbl==null?window.innerWidth<700:S.tbl; S.tbl=!cur; if(S.agg) render(); };
-$("mode").onchange=e=>{ S.mode=e.target.value; render(); };
 $("btnReload").onclick=()=>load(false);
 $("btnPng").onclick=exportPng;
 window.addEventListener("resize",()=>{ if(chart) chart.resize(); });
@@ -806,7 +838,9 @@ window.__SLA__={S,aggregate,pct,completeWeeks,render}; // للتجربة
   if(c){ S.agg=c.agg; S.sig=sigOf(c.agg); stamp(c.ts); try{ render(); }catch(e){ S.agg=null; } }   // عرض فوري من آخر نسخة
   if(S.agg) setDot("loading");
   load(!!S.agg,true);
-  setTimeout(()=>loadHours(true),1200);   // تحميل مسبق لبيانات الساعة عشان تفتح فورًا
+  try{ const hc=JSON.parse(localStorage.getItem("sla_hours_cache_v1")||"null");
+    if(hc&&hc.j&&String(hc.j.today)===keyOf(startOfToday())&&Date.now()-hc.ts<12*3600*1000&&Array.isArray(hc.j.hagg)){ S.hours=parseHours(hc.j); S.hday=""; fillHday(); } }catch(e){}   // عرض فوري من آخر نسخة
+  loadHours(true);   // تحميل مسبق لبيانات الساعة
   setInterval(()=>{ if(!document.hidden){ load(true); if(S.gran==="d"||S.gran==="h") loadHours(true); } }, CFG.POLL_SEC*1000);
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden && Date.now()-lastCheck>20000) load(true); });
   window.addEventListener("online",()=>load(true));
