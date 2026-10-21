@@ -203,7 +203,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
         <div class="sub" id="sub">—</div>
       </div>
       <div class="filters" id="filters" data-html2canvas-ignore="true">
-        <div class="seg" id="gran"><button type="button" data-g="w" class="on">أسبوعي</button><button type="button" data-g="d">يومي</button><button type="button" data-g="h">بالساعة</button></div>
+        <div class="seg" id="gran"><button type="button" data-g="w" class="on">أسبوعي</button><button type="button" data-g="d">يومي</button><button type="button" data-g="h">بالساعة</button><button type="button" data-g="p">الفترة</button></div>
         <span class="lbl" id="flbl">عدد الأسابيع:</span>
         <span id="chipsW" style="display:inline-flex;gap:6px;flex-wrap:wrap">
           <button class="chip" data-n="4">آخر 4</button>
@@ -218,6 +218,7 @@ table.nums td.na{color:#9aaab4;font-weight:500}
           <button class="chip" data-n="30">آخر 30 يومًا</button>
         </span>
         <span id="hdayWrap" style="display:none;align-items:center;gap:6px"><span class="lbl">الكروت ليوم:</span><select id="hday" class="hsel"></select></span>
+        <span id="pWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap"><span class="lbl">من</span><input type="date" id="pf" class="hsel"><span class="lbl">إلى</span><input type="date" id="pt" class="hsel"></span>
         <div class="seg" id="hmode" style="display:none;margin:0"><button type="button" data-m="c" class="on">تراكمي</button><button type="button" data-m="s">كل ساعة</button></div>
       </div>
     </div>
@@ -406,7 +407,7 @@ function pct(o,mode){
 
 /* ═════════════ الحالة العامة ═════════════ */
 const cnt=(o,mode)=> mode==="new" ? {n:(o.nc||0)+(o.nb||0)+(o.nbo||0), b:(o.nb||0)+(o.nbo||0)} : {n:o.n,b:o.b};
-const S={agg:null, sig:"", n:8, nd:14, gran:"w", mode:"new", hidden:{}, notice:"", tbl:null, hours:null, hcum:true, hday:"", hLoading:false, hFail:"", ctx:null};
+const S={agg:null, sig:"", n:8, nd:14, gran:"w", mode:"new", hidden:{}, notice:"", tbl:null, hours:null, hcum:true, hday:"", hLoading:false, hFail:"", ctx:null, pf:"", pt:""};
 let chart=null;
 
 function completeWeeks(){
@@ -436,6 +437,13 @@ function U(){
     return {d:false,h:true, all:b.slots, n:24, map:()=>b.map, key:s=>s.k,
       lab:s=>String(s.h).padStart(2,"0")+":00", tip:s=>DOW[fromKey(s.day).getDay()]+" "+dm(fromKey(s.day))+" — الساعة "+String(s.h).padStart(2,"0")+":00",
       cell:s=>String(s.h).padStart(2,"0")+":00", prevTxt:"", lastTxt:"", noPrev:"", range:s=>String(s.h).padStart(2,"0")+":00", word:"ساعة", words:"ساعة"};
+  }
+  if(S.gran==="p"){
+    const all=completeDays().filter(d=>{const k=keyOf(d); return (!S.pf||k>=S.pf)&&(!S.pt||k<=S.pt);});
+    return {d:true,p:true,key:keyOf, all, n:Math.max(all.length,1), map:()=>S.agg.days,
+      lab:(d,len)=>len<=14?[DOW[d.getDay()],dm(d)]:dm(d), tip:d=>DOW[d.getDay()]+" "+dm(d)+"/"+d.getFullYear(),
+      cell:d=>DOW[d.getDay()]+" "+dm(d), titlePrefix:"", prevTxt:"الفترة السابقة", lastTxt:"الفترة", noPrev:"لا توجد فترة سابقة للمقارنة",
+      range:d=>DOW[d.getDay()]+" "+dm(d), word:"يوم", words:"أيام"};
   }
   if(S.gran==="d"){
     const n=Math.min(S.nd,CFG.MAX_DAYS);
@@ -520,11 +528,13 @@ function render(){
     if(!S.hours && !S.hFail){ if(!S.hLoading) loadHours(false); showMsg("جاري تحميل بيانات الساعة…","",false); return; }
     if(S.hFail || !S.hours.hasTime){ fallback = S.hFail ? "عرض الساعة يحتاج نشر إضافة balagh_hours.gs في سكريبت البلاغات." : "تاريخ الإنشاء في الشيت بدون وقت، فلا يمكن العرض بالساعة."; S.gran="w"; }
   }
-  if(S.gran==="d" && !(S.agg&&S.agg.hasDaily)){ S.gran="w"; fallback="لعرض اليومي لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة."; }
+  if((S.gran==="d"||S.gran==="p") && !(S.agg&&S.agg.hasDaily)){ S.gran="w"; fallback="لعرض اليومي لازم نشر آخر نسخة من سكريبت البلاغات (balagh_reports.gs) ثم تحديث الصفحة."; }
+  if(S.gran==="p" && S.agg && S.agg.hasDaily && !(S.pf&&S.pt)){ const cd=completeDays(); if(cd.length){ S.pt=keyOf(cd[cd.length-1]); S.pf=keyOf(cd[Math.max(0,cd.length-7)]); } }
   const u=U();
   const weeks=u.all;
   const mode=S.mode;
-  if(!u.h && !weeks.length){ showMsg(u.d?"لا توجد أيام مكتملة":"لا توجد أسابيع مكتملة", u.d?"لا توجد بلاغات كافية لعرض يوم مكتمل واحد على الأقل.":"لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
+  if(u.p && !weeks.length){ hideOverlay(); if(chart){ chart.destroy(); chart=null; } $("kpis").innerHTML=""; $("nums").innerHTML=""; $("sub").textContent="الفترة: —"; syncControls(); const cd=completeDays(); banner("لا توجد بيانات في الفترة المحددة"+(cd.length?" — المتاح من "+dmy(cd[0])+" إلى "+dmy(cd[cd.length-1]):"")); return; }
+  if(!u.h && !weeks.length){ showMsg(u.p?"لا توجد بيانات في الفترة المحددة":u.d?"لا توجد أيام مكتملة":"لا توجد أسابيع مكتملة", u.d?"لا توجد بلاغات كافية لعرض يوم مكتمل واحد على الأقل.":"لا توجد بلاغات كافية لعرض أسبوع مكتمل واحد على الأقل.", false); return; }
   hideOverlay();
   let list=u.h?weeks:weeks.slice(-u.n);
   const labels=list.map(s=>u.lab(s,list.length));
@@ -566,7 +576,7 @@ function render(){
     plugins:[labelPlugin]
   };
   S.ctx={list,mode,u};
-  if(u.d && !S.hours && !S.hLoading && !S.hFail) loadHours(false);
+  if(u.d && !u.p && !S.hours && !S.hLoading && !S.hFail) loadHours(false);
   buildTable(list,mode,u); buildKpis(list,mode,u); buildLegend();   // نبني العناصر المحيطة أولًا عشان المقاسات تثبت قبل رسم الشارت
   if(chart){ chart.destroy(); }
   const showLabels = true && $('cv').parentElement.clientWidth>=700;
@@ -585,7 +595,28 @@ function render(){
   else if(u.n>weeks.length) banner(u.d?("المتاح "+weeks.length+" يومًا مكتملًا فقط، وتم عرض كل المتاح."):("المتاح "+weeks.length+" أسبوعًا مكتملًا فقط، وتم عرض كل المتاح."));
   else banner("");
 }
+function buildPeriodKpis(list,mode,u){
+  $("kpiNote").classList.remove("show");
+  const all=completeDays(), keys=list.map(keyOf), i0=all.findIndex(d=>keyOf(d)===keys[0]);
+  const prev=(i0>=list.length)?all.slice(i0-list.length,i0):[];
+  const agg=(sr,days)=>{ const t=mkO(); days.forEach(d=>{ const w=S.agg.days[keyOf(d)]; const o=sr.west?sumWest(w):(w&&w[sr.k]); if(o) for(const k in t) t[k]+=(o[k]||0); }); return t; };
+  const order=[...CFG.SERIES.filter(x=>x.west),...CFG.SERIES.filter(x=>!x.west)];
+  const a=list[0], b=list[list.length-1];
+  const rng='<span dir="ltr" style="unicode-bidi:isolate">'+dm(a)+(list.length>1?'–'+dm(b):'')+'</span>';
+  $("kpis").innerHTML=order.map(sr=>{
+    const o=agg(sr,list), v=pct(o,mode), q=cnt(o,mode), pv=prev.length?pct(agg(sr,prev),mode):null;
+    let d='<span class="kd na">'+u.noPrev+'</span>';
+    if(v!=null&&pv!=null){ const x=v-pv, ax=Math.abs(x).toFixed(1);
+      d = Math.abs(x)<0.05 ? '<span class="kd eq">■ بدون تغيير عن '+u.prevTxt+'</span>'
+        : '<span class="kd '+(x>0?'up':'dn')+'">'+(x>0?'▲':'▼')+' '+ax+' نقطة عن '+u.prevTxt+'</span>'; }
+    return '<div class="kpi'+(sr.west?' west':'')+'" style="--kc:'+sr.color+';--kt:'+(sr.tc||sr.color)+'">'
+      +'<div class="kn"><i></i>'+sr.k+'</div>'
+      +'<div class="kv">'+(v==null?'—':v.toFixed(1)+'%')+'</div>'
+      +d+'<div class="kw">الفترة: '+rng+' · '+q.n.toLocaleString("en")+(mode==="new"?' بلاغ مُقيَّم':' بلاغ')+'</div></div>';
+  }).join("");
+}
 function buildKpis(list,mode,u){
+  if(u.p){ buildPeriodKpis(list,mode,u); return; }
   if((u.d||u.h) && S.hours){ buildHourKpis(mode,u.h); return; }
   $("kpiNote").classList.remove("show");
   const lastW=list[list.length-1], prevW=list.length>1?list[list.length-2]:null;
@@ -728,19 +759,22 @@ function buildLegend(){
   });
 }
 function syncControls(){
+  const pp=S.gran==="p";
+  $("pWrap").style.display=pp?"inline-flex":"none";
+  if(pp && S.agg && S.agg.hasDaily){ const cd=completeDays(); if(cd.length){ const mn=keyOf(cd[0]), mx=keyOf(cd[cd.length-1]); ["pf","pt"].forEach(id=>{ $(id).min=mn; $(id).max=mx; }); } $("pf").value=S.pf; $("pt").value=S.pt; }
   const d=S.gran==="d";
   const hh=S.gran==="h";
-  $("chipsW").style.display=(d||hh)?"none":"inline-flex"; $("chipsD").style.display=d?"inline-flex":"none";
-  $("flbl").style.display=hh?"none":"";
+  $("chipsW").style.display=(d||hh||pp)?"none":"inline-flex"; $("chipsD").style.display=d?"inline-flex":"none";
+  $("flbl").style.display=(hh||pp)?"none":"";
   $("flbl").textContent=d?"عدد الأيام:":"عدد الأسابيع:";
   $("hmode").style.display=hh?"inline-flex":"none";
   document.querySelectorAll("#hmode button").forEach(b=>b.classList.toggle("on",(b.dataset.m==="c")===S.hcum));
   document.querySelectorAll("#gran button").forEach(b=>b.classList.toggle("on",b.dataset.g===S.gran));
   const cur=d?S.nd:S.n;
   document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.classList.toggle("on",String(c.dataset.n)===String(cur)));
-  $("granTxt").textContent=hh?"بالساعة":(d?"يومياً":"أسبوعياً");
-  $("hdayWrap").style.display=((d||hh)&&S.hours)?"inline-flex":"none";
-  $("cardHint").textContent=hh?"الساعة":(d?"تاريخ اليوم: يوم/شهر":"تاريخ الأسبوع: يوم/شهر");
+  $("granTxt").textContent=pp?"للفترة المحددة":hh?"بالساعة":(d?"يومياً":"أسبوعياً");
+  $("hdayWrap").style.display=((d||hh)&&S.hours&&!pp)?"inline-flex":"none";
+  $("cardHint").textContent=pp?"تاريخ اليوم: يوم/شهر":hh?"الساعة":(d?"تاريخ اليوم: يوم/شهر":"تاريخ الأسبوع: يوم/شهر");
 }
 function banner(t){ const b=$("banner"); b.textContent=t; b.classList.toggle("show",!!t); }
 
@@ -823,6 +857,8 @@ async function exportPng(){
 /* ═════════════ الأحداث ═════════════ */
 document.querySelectorAll("#filters .chip[data-n]").forEach(c=>c.onclick=()=>{ if(S.gran==="d") S.nd=+c.dataset.n; else S.n=+c.dataset.n; if(S.agg) render(); else syncControls(); });
 document.querySelectorAll("#gran button").forEach(b=>b.onclick=()=>{ S.gran=b.dataset.g; if(S.agg) render(); else syncControls(); });
+function onPeriod(){ let f=$("pf").value, t=$("pt").value; if(f&&t&&f>t){ const x=f; f=t; t=x; } S.pf=f; S.pt=t; if(S.agg) render(); }
+$("pf").onchange=onPeriod; $("pt").onchange=onPeriod;
 $("hday").onchange=e=>{ S.hday=e.target.value; if(S.gran==="h") render(); else if(S.ctx&&S.hours) buildKpis(S.ctx.list,S.ctx.mode,S.ctx.u); };
 document.querySelectorAll("#hmode button").forEach(b=>b.onclick=()=>{ S.hcum=b.dataset.m==="c"; if(S.gran==="h") render(); });
 $("btnTbl").onclick=()=>{ const cur=S.tbl==null?window.innerWidth<700:S.tbl; S.tbl=!cur; if(S.agg) render(); };
